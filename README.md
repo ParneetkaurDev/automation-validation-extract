@@ -16,7 +16,7 @@ No AI is involved: the same branch always gives the same output.
 Needs **Node 18+**, **git** and (for the business report in `compare`) **python3** with `openpyxl`.
 
 ```bash
-cd ~/Documents/MyWorkingFolder/"Purchase Finance"/validation-extract
+cd ~/Documents/MyWorkingFolder/"Purchase Finance"/automation-validation-extract
 npm install
 ```
 
@@ -218,20 +218,46 @@ npm run extract -- draft-RET11-1.2.5
 | `run-branch.mjs` | the three npm commands (fetch from GitHub, call the scripts below) |
 | `extract-validations.mjs` | L1 + L2 extractor (`--repo <git dir> --ref <branch>` or `--config <dir>`) |
 | `lib/l2-analyse.mjs` | reads L2 JavaScript as a syntax tree (never runs it) and turns each failure into a check |
+| `lib/l2-patterns.mjs` | registry of every L2 pattern the analyser understands, with examples (tested) |
 | `lib/l1-vs-l2.mjs` | the L2 vs L1 comparison (*In L1?* column) |
 | `gold.mjs` | `partition` (common / intersection / specific), `compare`, `simplify`, `crosscall` |
 | `domain-report.py` | business workbook of `compare` |
 | `branch-groups.json` | TRV / RET / FIS branch groups |
 | `lint-l2.mjs`, `standard/`, `ci/`, `gold/` | L2 coding standard, CI gate and older FIS12 gold baselines |
 
-How L2 is read: the base64 code is decoded and parsed with Babel. Each `return { valid: false }` becomes a check: the
-nearest `if` is the condition, outer `if`s make it *Conditional*, variables are traced back to the payload or to
-data from a previous call, and the condition is mapped to a check type (Required, Allowed values, Matches, …).
-Anything not recognised is reported as *Custom logic*, never guessed.
+### How L2 is read
+
+The base64 code of each flow step is decoded and parsed with Babel into a syntax tree - it is never run. Three steps,
+the same for every domain:
+
+1. **Failure points** - every way the code says "invalid":
+   `return { valid: false }`, a local reporter such as `pushError(400, "…")` or `errors.push({ … })` into the list that
+   decides `valid` (`return { valid: errors.length === 0 }`), and `throw new Error("…")` inside a `try` whose `catch`
+   returns `{ valid: false }`.
+2. **When it runs** - the enclosing `if`s plus earlier exits in the same block (`if (x) return { valid: true }`,
+   `if (x) continue;`). Shown in plain words in the **Runs** column: *Conditional (Only when order.items has entries)*.
+3. **What it checks** - the condition is mapped to a check type (Required, Non-empty list, Expected value, Allowed
+   values, Matches, Exists in, Must contain, At least one of, Data type, Format, Comparison, Must be absent).
+   Anything not recognised is reported as *Custom logic*, never guessed.
+
+Every supported pattern is listed, with an example, in `lib/l2-patterns.mjs` and verified by
+`test/l2-patterns.test.mjs`. To support a new pattern, add the rule in `lib/l2-analyse.mjs` and an entry there.
+
+When `extract` runs, each branch gets one **L2 coverage** line in the terminal: validate functions, pass-through,
+functions where no failure point was recognised (listed), failure points per kind, conditional / custom / untraced checks.
+
+### Recommendation for new validators
+
+Write **new** L2 code in the declarative `runChecks` style described in `standard/L2_STANDARD.md`: every check is a
+data row `{ id, desc, path, rule, when }`, so this tool reads it exactly and nothing has to be inferred. Existing
+validators do not need to change.
 
 Tests (no network needed):
 ```bash
 node test/run-tests.mjs          # runner, lint, extractor, compare
 node test/l2-analyse.test.mjs    # L2 patterns
 node test/l1-vs-l2.test.mjs      # L2 vs L1 comparison
+node test/l2-patterns.test.mjs   # every pattern in the registry
 ```
+
+The before/after check of the L2 analyser on all 42 branches is in `out/baseline/BEFORE_AFTER.md`.

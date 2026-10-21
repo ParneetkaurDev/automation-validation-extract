@@ -607,31 +607,6 @@ async function writeDomainWorkbook(file, src, res) {
   ss.getRow(sumRows.length + 1).font = { name: FONT, size: 10, bold: true };
   ss.addRow([]);
   for (const l of IN_L1_VALUES) ss.addRow([l, IN_L1_HELP[l]]);
-  // L2 coverage: how much of the L2 code the tool could read (so a new coding style never goes unnoticed)
-  const cv = res.l2?.coverage;
-  if (cv) {
-    const pct = (n) => (cv.checks ? ` (${(100 * n / cv.checks).toFixed(1)}%)` : '');
-    const covRows = [
-      { Item: 'Distinct validate functions', Value: cv.functions },
-      { Item: '  with checks', Value: cv.withChecks },
-      { Item: '  pass-through (only return { valid: true })', Value: cv.passThrough },
-      { Item: '  code but no failure point recognised (review)', Value: cv.unrecognised.length },
-      { Item: 'Failure points: return { valid: false }', Value: cv.sites.return },
-      { Item: 'Failure points: pushError / errors.push', Value: cv.sites.report },
-      { Item: 'Failure points: throw inside try', Value: cv.sites.throw },
-      { Item: 'Distinct L2 checks', Value: cv.checks },
-      { Item: '  conditional ("Only when …")', Value: cv.conditional + pct(cv.conditional) },
-      { Item: '  custom logic (not readable)', Value: cv.custom + pct(cv.custom) },
-      { Item: '  field not traced to the payload', Value: cv.unresolved + pct(cv.unresolved) },
-      { Item: '', Value: '' },
-      { Item: 'Recommendation for NEW validators', Value: 'Write new L2 code in the declarative runChecks style (standard/L2_STANDARD.md): every check is a data row { id, desc, path, rule, when }, so this tool reads it exactly. Existing validators do not need to change.' },
-    ];
-    const ws = sheet(wb, 'L2 coverage', [['Item', 'Item', 48], ['Value', 'Value', 110]], covRows, ['Value']);
-    if (cv.unrecognised.length) {
-      ws.addRow([]); ws.addRow(['Functions to review (no failure point recognised)', '']).font = { name: FONT, size: 10, bold: true };
-      for (const u of cv.unrecognised) ws.addRow([`${u.api} (${u.actionId})`, `${u.flow} step ${u.step}`]);
-    }
-  }
   const probs = [...res.l1.problems.map(p => ({ layer: 'L1', p })), ...(res.l2?.problems || []).map(p => ({ layer: 'L2', p }))];
   if (probs.length) sheet(wb, 'Parse problems', [['Layer', 'layer', 8], ['Problem', 'p', 140]], probs);
   await wb.xlsx.writeFile(file);
@@ -665,7 +640,7 @@ for (const src of sources) {
   const u = res.l2 ? uniqueL2(res.l2.checks) : [];
   const cv = res.l2?.coverage;
   console.log(`${res.error ? 'ERROR' : 'ok   '}  ${src.label.padEnd(28)} ${String(meta.domain || '').padEnd(15)} ${String(meta.version || '').padEnd(6)} L1=${String(res.l1?.rows?.length ?? 0).padEnd(5)} L2 steps=${String(res.l2?.steps.length ?? '-').padEnd(5)} L2 unique=${String(u.length).padEnd(4)} custom=${String(u.filter(x => x.checkType === 'Custom logic').length).padEnd(4)} problems=${(res.l1?.problems?.length ?? 0) + (res.l2?.problems?.length ?? 0)}${res.error ? '  ' + res.error : ''}`);
-  if (cv) console.log(`       L2 coverage: ${cv.functions} functions (${cv.passThrough} pass-through${cv.unrecognised.length ? `, ${cv.unrecognised.length} UNRECOGNISED - see 'L2 coverage' tab` : ''}) · failure points return=${cv.sites.return} pushError=${cv.sites.report} throw=${cv.sites.throw} · conditional ${cv.conditional} · custom ${cv.custom} · untraced ${cv.unresolved}`);
+  if (cv) console.log(`       L2 coverage: ${cv.functions} functions (${cv.passThrough} pass-through${cv.unrecognised.length ? `, ${cv.unrecognised.length} UNRECOGNISED: ${cv.unrecognised.map(u => `${u.flow} step ${u.step} (${u.api})`).join('; ')}` : ''}) · failure points return=${cv.sites.return} pushError=${cv.sites.report} throw=${cv.sites.throw} · conditional ${cv.conditional} · custom ${cv.custom} · untraced ${cv.unresolved}`);
 }
 // Stable order so two runs / two branches line up row by row: every row gets the same Key as the common (gold) list
 // (Layer | API | Field | Check) and rows are sorted by branch → API (flow order) → Key → values → source location.
