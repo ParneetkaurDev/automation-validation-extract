@@ -108,6 +108,9 @@ tw('checks before the early exit stay Always', `${O} if (!order.id) ${FAIL} if (
 tw('continue guard in a loop', `${O} for (const it of order.items) { if (it.location_id == null) continue; if (it.location_id !== 'L1') ${FAIL} }`, ['Only when order.items[].location_id is sent']);
 tw('enclosing if in plain words', `${O} if (order.items.length > 0) { if (!order.items[0].id) ${FAIL} }`, ['Only when order.items has entries']);
 tw('exit inside a loop does not leak after the loop', `${O} for (const it of order.items) { if (it.skip) continue; if (!it.id) ${FAIL} } if (!order.id) ${FAIL}`, ['Only when order.items[].skip is not sent', '']);
+tw('condition held in a local', `${O} const bpp = order.payment?.collected_by === 'BPP'; if (bpp) { if (!order.payment.uri) ${FAIL} }`, ['Only when order.payment.collected_by is BPP']);
+tw('Array.isArray / includes / length in plain words', `${O} if (Array.isArray(order.items) && order.items.length === 1) { if (!order.items[0].id) ${FAIL} }`, ['Only when order.items is a list and order.items has exactly 1 entry']);
+tw('sessionData on its own is dropped', `${O} if (sessionData && sessionData.order_id) { if (order.id !== sessionData.order_id) ${FAIL} }`, ['Only when order_id from a previous call is available']);
 tw('if/else exit is not an early exit', `${O} if (order.a) { return { valid: true }; } else { order.b = 1; } if (!order.id) ${FAIL}`, ['']);
 
 // ── Step 3: at least one of ──
