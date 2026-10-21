@@ -1,0 +1,27 @@
+{
+  "name": "ondc-validation-extract",
+  "version": "0.4.0",
+  "description": "Deterministic extractor for ONDC L1/L2/cross-call validations, gold baselines and a CI gate.",
+  "type": "module",
+  "bin": {
+    "extract-validations": "./extract-validations.mjs",
+    "validation-gold": "./gold.mjs",
+    "lint-l2": "./lint-l2.mjs"
+  },
+  "scripts": {
+    "extract": "node run-branch.mjs extract",
+    "common": "node run-branch.mjs common",
+    "common:trv": "node run-branch.mjs common TRV",
+    "common:ret": "node run-branch.mjs common RET",
+    "common:fis": "node run-branch.mjs common FIS",
+    "compare": "node run-branch.mjs compare"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@babel/parser": "7.25.9",
+    "exceljs": "4.4.0",
+    "yaml": "2.5.1"
+  }
+}

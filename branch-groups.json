@@ -1,0 +1,51 @@
+{
+  "_comment": "Branch groups for `npm run common -- <GROUP>`. Edit freely: add/remove branches or add new groups (e.g. LOG, NTS).",
+  "TRV": [
+    "draft-TRV10-2.0.1",
+    "draft-TRV10-2.1.0",
+    "draft-TRV11-2.0.0",
+    "draft-TRV11-2.0.1",
+    "draft-TRV11-2.1.0",
+    "draft-TRV12-2.0.0",
+    "draft-TRV13-2.0.0",
+    "draft-TRV13-2.0.1",
+    "draft-TRV14-2.0.0"
+  ],
+  "RET": [
+    "draft-RET10-1.2.0",
+    "draft-RET10-1.2.5",
+    "draft-RET11-1.2.0",
+    "draft-RET11-1.2.5",
+    "draft-RET12-1.2.0",
+    "draft-RET12-1.2.5",
+    "draft-RET13-1.2.0",
+    "draft-RET13-1.2.5",
+    "draft-RET14-1.2.0",
+    "draft-RET14-1.2.5",
+    "draft-RET15-1.2.0",
+    "draft-RET15-1.2.5",
+    "draft-RET16-1.2.0",
+    "draft-RET16-1.2.5",
+    "draft-RET18-1.2.0",
+    "draft-RET18-1.2.5",
+    "draft-RETINVL-1.2.5",
+    "draft-RETeB2B"
+  ],
+  "FIS": [
+    "draft-FIS10-GIFTCARD-2.1.0",
+    "draft-FIS11-2.0.0",
+    "draft-FIS12-2.0.3",
+    "draft-FIS12-2.3.0",
+    "draft-FIS12-GD-2.0.2",
+    "draft-FIS12-PF-2.2.0",
+    "draft-FIS12-PF-2.2.1",
+    "draft-FIS12-PF-2.3.0",
+    "draft-FIS12-PL-2.0.1",
+    "draft-FIS12BL-2.3.0",
+    "draft-FIS12SL-2.3.0",
+    "draft-FIS13-HEALTH-2.0.0",
+    "draft-FIS13-HEALTH-2.0.1",
+    "draft-FIS13-sachet",
+    "draft-FIS14-2.1.0"
+  ]
+}

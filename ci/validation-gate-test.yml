@@ -1,0 +1,37 @@
+# TEST workflow for the validation gate.
+# Runs ONLY the gate (no parse / push-to-db), and ONLY on branches named test-validation-gate*,
+# so it cannot touch the existing Spec Workflow or the database.
+# Copy to: .github/workflows/validation-gate-test.yml   (delete it again after the test)
+name: Validation Gate (test)
+
+on:
+  push:
+    branches: [ "test-validation-gate*" ]
+  pull_request:
+    branches: [ "test-validation-gate*" ]
+  workflow_dispatch:
+
+jobs:
+  validation-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install validation tool
+        working-directory: tools/validation-extract
+        run: npm ci
+
+      - name: Validation gate (fails the build on MISSING / BLOCKER)
+        run: bash tools/validation-extract/ci/validation-gate.sh config validation-gate
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-gate
+          path: validation-gate/
+          retention-days: 7

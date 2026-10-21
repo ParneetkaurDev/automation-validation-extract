@@ -1,0 +1,38 @@
+# Versioned gold baselines. compare --gold auto picks the entry whose domains + versions match the branch.
+baselines:
+  - name: FIS12@2.3.0
+    file: FIS12@2.3.0.csv
+    scope: family
+    domains:
+      - ONDC:FIS12
+      - ONDC:FIS12:BL
+      - ONDC:FIS12:PF
+      - ONDC:FIS12:SL
+    versions:
+      - 2.3.0
+    built_from:
+      - draft-FIS12-2.3.0
+      - draft-FIS12BL-2.3.0
+      - draft-FIS12SL-2.3.0
+      - draft-FIS12-PF-2.3.0
+    min_share: 0.75
+    approved_by: ""
+    rules: 980
+    created: 2026-10-17
+  - name: FIS12@2.3.0-common
+    file: FIS12@2.3.0-common.csv
+    scope: family
+    domains:
+      - ONDC:FIS12
+      - ONDC:FIS12:BL
+      - ONDC:FIS12:PF
+    versions:
+      - 2.3.0
+    built_from:
+      - draft-FIS12-2.3.0
+      - draft-FIS12BL-2.3.0
+      - draft-FIS12-PF-2.3.0
+    min_share: 1
+    approved_by: ""
+    rules: 919
+    created: 2026-10-19

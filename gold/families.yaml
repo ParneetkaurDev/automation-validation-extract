@@ -1,0 +1,48 @@
+# Gold baseline families. build-all builds one baseline per family and registers it in index.yaml.
+#   min_share: a validation is "core" when at least this share of the family's branches has it
+#              (1 = every branch; 0.75 = 3 of 4). Lower it only while branches are being aligned.
+#   scope:     family (same domain family + version) or hub (all domains of a hub - used when no family fits)
+#   approved_by: fill in when the baseline has been reviewed - it is then the gold standard for CI.
+# Active: FIS12@2.3.0 only (one domain for now). Uncomment a family to switch it on.
+families:
+  # ── Financial services ──
+  - name: FIS12@2.3.0
+    branches: [draft-FIS12-2.3.0, draft-FIS12BL-2.3.0, draft-FIS12SL-2.3.0, draft-FIS12-PF-2.3.0]
+    min_share: 0.75
+# - name: FIS12@2.0.x
+#   branches: [draft-FIS12-2.0.3, draft-FIS12-GD-2.0.2, draft-FIS12-PL-2.0.1]
+#   min_share: 0.67
+# - name: FIS13@2.0.0
+#   branches: [draft-FIS13-HEALTH-2.0.0, draft-FIS13-HEALTH-2.0.1, draft-FIS13-sachet]
+#   min_share: 0.67
+# - name: FIS-hub
+#   scope: hub
+#   branches: [draft-FIS10-GIFTCARD-2.1.0, draft-FIS11-2.0.0, draft-FIS12-2.0.3, draft-FIS12-2.3.0, draft-FIS12-GD-2.0.2,
+#              draft-FIS12-PF-2.2.1, draft-FIS12-PF-2.3.0, draft-FIS12-PL-2.0.1, draft-FIS12BL-2.3.0, draft-FIS12SL-2.3.0,
+#              draft-FIS13-HEALTH-2.0.0, draft-FIS13-HEALTH-2.0.1, draft-FIS13-sachet, draft-FIS14-2.1.0]
+#   min_share: 0.8
+  # ── Retail ──
+# - name: RET@1.2.0
+#   branches: [draft-RET10-1.2.0, draft-RET11-1.2.0, draft-RET12-1.2.0, draft-RET13-1.2.0, draft-RET14-1.2.0,
+#              draft-RET15-1.2.0, draft-RET16-1.2.0, draft-RET18-1.2.0]
+#   min_share: 0.8
+# - name: RET@1.2.5
+#   branches: [draft-RET10-1.2.5, draft-RET11-1.2.5, draft-RET12-1.2.5, draft-RET13-1.2.5, draft-RET14-1.2.5,
+#              draft-RET15-1.2.5, draft-RET16-1.2.5, draft-RET18-1.2.5, draft-RETINVL-1.2.5, draft-RETeB2B]
+#   min_share: 0.8
+  # ── Travel ──
+# - name: TRV10
+#   branches: [draft-TRV10-2.0.1, draft-TRV10-2.1.0]
+# - name: TRV11
+#   branches: [draft-TRV11-2.0.0, draft-TRV11-2.0.1, draft-TRV11-2.1.0]
+# - name: TRV13
+#   branches: [draft-TRV13-2.0.0, draft-TRV13-2.0.1]
+# - name: TRV-hub
+#   scope: hub
+#   branches: [draft-TRV10-2.0.1, draft-TRV10-2.1.0, draft-TRV11-2.0.0, draft-TRV11-2.0.1, draft-TRV11-2.1.0,
+#              draft-TRV12-2.0.0, draft-TRV13-2.0.0, draft-TRV13-2.0.1, draft-TRV14-2.0.0]
+#   min_share: 0.8
+  # ── Logistics ──
+# - name: LOG@1.2.5
+#   branches: [draft-logistics-1.2.5, draft-LOG11-1.2.5]
+  # Not baselined yet (only one branch of a kind): NTS10-RSF-1.0, NTS10-2.0.0, logistics-1.2.0.

@@ -1,0 +1,39 @@
+# Validation gate - add this job to .github/workflows/spec-workflow.yml (same "jobs:" block as process-spec).
+#
+# It checks out the spec branch, plus the validation tool (with the gold baselines) from one central place,
+# so a domain branch cannot change its own gold standard. Decide the tool's home with the CI owner:
+#   - a separate repo  → set repository variable VALIDATION_TOOL_REPO (e.g. ONDC-Official/validation-extract)
+#   - inside this repo → replace the second checkout with:  run: cp -r tools/validation-extract .validation-tool
+  validation-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout spec branch
+        uses: actions/checkout@v4
+
+      - name: Checkout validation tool + gold baselines
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.VALIDATION_TOOL_REPO }}
+          ref: ${{ vars.VALIDATION_TOOL_REF || 'main' }}
+          path: .validation-tool
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install tool
+        working-directory: .validation-tool
+        run: npm ci || npm install
+
+      - name: Run validation gate (extract, lint, compare with gold)
+        env:
+          STRICT_L2: ${{ vars.STRICT_L2 || '0' }}     # set to 1 per domain once its L2 code follows the standard
+        run: bash .validation-tool/ci/validation-gate.sh config validation-gate
+
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-gate
+          path: validation-gate/
+          retention-days: 30

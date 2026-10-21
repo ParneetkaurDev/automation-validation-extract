@@ -1,0 +1,1115 @@
+{
+ "description": "Common validations by payload (finance). Source: Common_Validations_By_Payload.docx (14 Oct 2026). l1 = [field, rule], l2 = [check, example message], crosscall = catalogue with applies-to APIs.",
+ "payloads": [
+  {
+   "api": "search",
+   "l1": [],
+   "l2": []
+  },
+  {
+   "api": "on_search",
+   "l1": [
+    [
+     "catalog.descriptor.name",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].categories[*].descriptor.code",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].categories[*].id",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].descriptor.name",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].id",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].items[*].category_ids[*]",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].items[*].id",
+     "Required"
+    ],
+    [
+     "catalog.providers[*].tags[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "tags[*].list[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ]
+   ],
+   "l2": []
+  },
+  {
+   "api": "select",
+   "l1": [
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "Selected item id exists in the on_search catalog",
+     "items.id not found in sessionData.items"
+    ]
+   ]
+  },
+  {
+   "api": "on_select",
+   "l1": [
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.items[*].price.value",
+     "Required"
+    ],
+    [
+     "order.provider.descriptor.name",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ],
+    [
+     "order.provider.tags[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.quote.breakup[*].price.value",
+     "Required"
+    ],
+    [
+     "order.quote.breakup[*].title",
+     "Required"
+    ],
+    [
+     "order.quote.price.value",
+     "Required"
+    ],
+    [
+     "tags[*].list[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ]
+   ],
+   "l2": [
+    [
+     "message.order is present",
+     "Missing message.order in payload"
+    ]
+   ]
+  },
+  {
+   "api": "init",
+   "l1": [
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ]
+   ],
+   "l2": []
+  },
+  {
+   "api": "on_init",
+   "l1": [
+    [
+     "order.fulfillments[*].type",
+     "Values must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.items[*].price.value",
+     "Required"
+    ],
+    [
+     "order.payments[*].type",
+     "Required"
+    ],
+    [
+     "order.provider.descriptor.name",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ],
+    [
+     "order.provider.tags[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.quote.price.value",
+     "Required"
+    ]
+   ],
+   "l2": []
+  },
+  {
+   "api": "confirm",
+   "l1": [
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "message.order is present",
+     "Missing message.order in payload"
+    ],
+    [
+     "order.provider.id is present",
+     "Missing provider.id in payload"
+    ],
+    [
+     "order.items is present and each item has an id",
+     "Missing items in payload"
+    ]
+   ]
+  },
+  {
+   "api": "on_confirm",
+   "l1": [
+    [
+     "order.fulfillments[*].type",
+     "Values must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.items[*].price.value",
+     "Required"
+    ],
+    [
+     "order.provider.descriptor.name",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ],
+    [
+     "order.provider.tags[*].descriptor.code",
+     "Tag codes must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.quote.price.value",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "order.id is present",
+     "Missing order.id in payload"
+    ]
+   ]
+  },
+  {
+   "api": "status",
+   "l1": [],
+   "l2": []
+  },
+  {
+   "api": "on_status",
+   "l1": [
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ]
+   ],
+   "l2": []
+  },
+  {
+   "api": "update",
+   "l1": [
+    [
+     "order.id",
+     "Required"
+    ]
+   ],
+   "l2": []
+  },
+  {
+   "api": "on_update",
+   "l1": [
+    [
+     "order.fulfillments[*].state.descriptor.code",
+     "Values must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.fulfillments[*].type",
+     "Values must be in the allowed list (list maintained per domain)"
+    ],
+    [
+     "order.id",
+     "Required"
+    ],
+    [
+     "order.items[*].id",
+     "Required"
+    ],
+    [
+     "order.payments[*].status",
+     "Required"
+    ],
+    [
+     "order.payments[*].type",
+     "Required"
+    ],
+    [
+     "order.provider.id",
+     "Required"
+    ],
+    [
+     "order.quote.breakup[*].price.value",
+     "Required"
+    ],
+    [
+     "order.quote.breakup[*].title",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "order.id is present",
+     "Missing order.id in payload"
+    ]
+   ]
+  },
+  {
+   "api": "cancel",
+   "l1": [],
+   "l2": []
+  },
+  {
+   "api": "on_cancel",
+   "l1": [],
+   "l2": []
+  },
+  {
+   "api": "issue",
+   "l1": [
+    [
+     "issue.actions[*].action_by",
+     "Required"
+    ],
+    [
+     "issue.actions[*].descriptor.code",
+     "Required"
+    ],
+    [
+     "issue.actions[*].descriptor.short_desc",
+     "Required"
+    ],
+    [
+     "issue.actions[*].id",
+     "Required"
+    ],
+    [
+     "issue.actions[*].updated_at",
+     "Required"
+    ],
+    [
+     "issue.actors[*].id",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.contact.email",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.contact.phone",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.person.name",
+     "Required"
+    ],
+    [
+     "issue.actors[*].type",
+     "Required; values must be in: INTERFACING_NP, COUNTERPARTY_NP, CASCADED_NP, PROVIDER, AGENT, CUSTOMER, INTERFACING_NP_GRO, COUNTERPARTY_NP_GRO, CASCADED_NP_GRO, CONSUMER"
+    ],
+    [
+     "issue.category",
+     "Values must be in: FULFILLMENT, PAYMENT, ORDER"
+    ],
+    [
+     "issue.complainant_info.contact.phone",
+     "Required"
+    ],
+    [
+     "issue.complainant_info.person.name",
+     "Required"
+    ],
+    [
+     "issue.created_at",
+     "Required"
+    ],
+    [
+     "issue.descriptor.additional_desc.content_type",
+     "Required"
+    ],
+    [
+     "issue.descriptor.additional_desc.url",
+     "Required"
+    ],
+    [
+     "issue.descriptor.code",
+     "Required"
+    ],
+    [
+     "issue.descriptor.long_desc",
+     "Required"
+    ],
+    [
+     "issue.descriptor.short_desc",
+     "Required"
+    ],
+    [
+     "issue.id",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.complainant_actions[*].complainant_action",
+     "Values must be in: OPEN, CLOSE, ESCALATE"
+    ],
+    [
+     "issue.last_action_id",
+     "Required"
+    ],
+    [
+     "issue.level",
+     "Required; values must be in: ISSUE, GREVIENCE, DISPUTE"
+    ],
+    [
+     "issue.order_details.items[*].id",
+     "Required"
+    ],
+    [
+     "issue.order_details.provider_id",
+     "Required"
+    ],
+    [
+     "issue.refs[*].ref_id",
+     "Required"
+    ],
+    [
+     "issue.refs[*].ref_type",
+     "Required; values must be in: ORDER, ITEM, FULFILLMENT, TRANSACTION_ID, MESSAGE_ID, PROVIDER, COMPLAINT, ACTION, PAYMENT, CUSTOMER, AGENT"
+    ],
+    [
+     "issue.source_id",
+     "Required"
+    ],
+    [
+     "issue.status",
+     "Values must be in the allowed list (list maintained per domain); no duplicates"
+    ],
+    [
+     "issue.sub_category",
+     "Values must be in: FLM01, FLM02, FLM202, FLM203, FLM204, FLM205, FLM206, FLM207, FLM208, FLM209, FLM210, FLM211, FLM212, PMT01, PMT02, PMT03, PMT04, PMT05, PMT06, PMT07, PMT08, PMT09, PTM09, PTM10, ORD01, ORD02, ORD03, ORD04"
+    ],
+    [
+     "issue.updated_at",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "message.issue is present",
+     "Missing message or issue object in payload"
+    ],
+    [
+     "issue.id is present",
+     "Missing issue ID"
+    ],
+    [
+     "issue.created_at and issue.updated_at are present",
+     "Missing issue created_at timestamp"
+    ],
+    [
+     "issue refs ORDER ref_id equals the order_id from the confirmed order",
+     "Issue ORDER ref_id does not match session order_id"
+    ],
+    [
+     "issue actions are present (incl. the expected respondent action)",
+     "Missing issue actions"
+    ],
+    [
+     "issue.status matches the issue action (OPEN / CLOSED / RESOLVED / PROCESSING)",
+     "Issue status should be OPEN for issue_open action, but got"
+    ]
+   ]
+  },
+  {
+   "api": "on_issue",
+   "l1": [
+    [
+     "issue.actions[*].action_by",
+     "Required"
+    ],
+    [
+     "issue.actions[*].descriptor.code",
+     "Required"
+    ],
+    [
+     "issue.actions[*].descriptor.short_desc",
+     "Required"
+    ],
+    [
+     "issue.actions[*].id",
+     "Required"
+    ],
+    [
+     "issue.actions[*].updated_at",
+     "Required"
+    ],
+    [
+     "issue.actors[*].id",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.contact.email",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.contact.phone",
+     "Required"
+    ],
+    [
+     "issue.actors[*].info.person.name",
+     "Required"
+    ],
+    [
+     "issue.actors[*].type",
+     "Required; values must be in: INTERFACING_NP, COUNTERPARTY_NP, CASCADED_NP, PROVIDER, AGENT, CUSTOMER, INTERFACING_NP_GRO, COUNTERPARTY_NP_GRO, CASCADED_NP_GRO, CONSUMER"
+    ],
+    [
+     "issue.created_at",
+     "Required"
+    ],
+    [
+     "issue.id",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].respondent_action",
+     "Required; values must be in: OPEN, PROCESSING, RESOLVED, CLOSED, INFO_PROVIDED, NEED_MORE_INFO"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].short_desc",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_at",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_by.org.name",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_by.person.name",
+     "Required"
+    ],
+    [
+     "issue.level",
+     "Required; values must be in: ISSUE, GREVIENCE, DISPUTE"
+    ],
+    [
+     "issue.refs[*].ref_id",
+     "Required"
+    ],
+    [
+     "issue.refs[*].ref_type",
+     "Required; values must be in: ORDER, ITEM, FULFILLMENT, TRANSACTION_ID, MESSAGE_ID, PROVIDER, COMPLAINT, ACTION, PAYMENT, CUSTOMER, AGENT"
+    ],
+    [
+     "issue.status",
+     "Values must be in: OPEN, CLOSED, PROCESSING, RESOLVED, NEED_MORE_INFO, INFO_PROVIDED; no duplicates"
+    ],
+    [
+     "issue.updated_at",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "message.issue is present",
+     "Missing message or issue object in payload"
+    ],
+    [
+     "issue.id is present",
+     "Missing issue ID"
+    ],
+    [
+     "issue.created_at and issue.updated_at are present",
+     "Missing issue created_at timestamp"
+    ],
+    [
+     "issue refs ORDER ref_id equals the order_id from the confirmed order",
+     "Issue ORDER ref_id does not match session order_id"
+    ],
+    [
+     "issue actions are present (incl. the expected respondent action)",
+     "Missing issue actions"
+    ],
+    [
+     "issue.status matches the issue action (OPEN / CLOSED / RESOLVED / PROCESSING)",
+     "Issue status should be OPEN for issue_open action, but got"
+    ]
+   ]
+  },
+  {
+   "api": "issue_status",
+   "l1": [
+    [
+     "issue_id",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "issue.id is present",
+     "Missing issue ID"
+    ]
+   ]
+  },
+  {
+   "api": "on_issue_status",
+   "l1": [
+    [
+     "issue.created_at",
+     "Required"
+    ],
+    [
+     "issue.id",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].respondent_action",
+     "Required; values must be in: OPEN, PROCESSING, RESOLVED, CLOSED, INFO_PROVIDED, NEED_MORE_INFO"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].short_desc",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_at",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_by.org.name",
+     "Required"
+    ],
+    [
+     "issue.issue_actions.respondent_actions[*].updated_by.person.name",
+     "Required"
+    ],
+    [
+     "issue.updated_at",
+     "Required"
+    ]
+   ],
+   "l2": [
+    [
+     "message.issue is present",
+     "Missing message or issue object in payload"
+    ],
+    [
+     "issue.id is present",
+     "Missing issue ID"
+    ],
+    [
+     "issue.created_at and issue.updated_at are present",
+     "Missing issue created_at timestamp"
+    ],
+    [
+     "issue refs ORDER ref_id equals the order_id from the confirmed order",
+     "Issue ORDER ref_id does not match session order_id"
+    ],
+    [
+     "issue actions are present (incl. the expected respondent action)",
+     "Missing issue actions"
+    ],
+    [
+     "issue.status matches the issue action (OPEN / CLOSED / RESOLVED / PROCESSING)",
+     "Issue status should be OPEN for issue_open action, but got"
+    ]
+   ]
+  }
+ ],
+ "crosscall": [
+  {
+   "id": "CX1",
+   "group": "Request / response pairing",
+   "check": "context.transaction_id equals the transaction_id of the request",
+   "apis": [
+    "on_search",
+    "on_select",
+    "on_init",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel",
+    "on_issue",
+    "on_issue_status"
+   ],
+   "against": "matching request"
+  },
+  {
+   "id": "CX2",
+   "group": "Request / response pairing",
+   "check": "context.message_id equals the message_id of the request",
+   "apis": [
+    "on_search",
+    "on_select",
+    "on_init",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel",
+    "on_issue",
+    "on_issue_status"
+   ],
+   "against": "matching request"
+  },
+  {
+   "id": "CX3",
+   "group": "Request / response pairing",
+   "check": "context.timestamp is not earlier than the request timestamp",
+   "apis": [
+    "on_search",
+    "on_select",
+    "on_init",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel",
+    "on_issue",
+    "on_issue_status"
+   ],
+   "against": "matching request"
+  },
+  {
+   "id": "CX4",
+   "group": "Request / response pairing",
+   "check": "bpp_id / bpp_uri equal the BPP that sent the selected on_search",
+   "apis": [
+    "select",
+    "init",
+    "confirm",
+    "status",
+    "update",
+    "cancel",
+    "on_select",
+    "on_init",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "on_search"
+  },
+  {
+   "id": "CX5",
+   "group": "Request / response pairing",
+   "check": "bap_id / bap_uri unchanged for the whole transaction",
+   "apis": [
+    "select",
+    "init",
+    "confirm",
+    "status",
+    "update",
+    "cancel",
+    "on_select",
+    "on_init",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "search"
+  },
+  {
+   "id": "PR1",
+   "group": "Provider",
+   "check": "order.provider.id exists in the on_search catalog",
+   "apis": [
+    "select",
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "on_search"
+  },
+  {
+   "id": "PR2",
+   "group": "Provider",
+   "check": "order.provider.id unchanged from the previous order call",
+   "apis": [
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "previous call"
+  },
+  {
+   "id": "IT1",
+   "group": "Items",
+   "check": "Every order.items[].id exists in the on_search catalog",
+   "apis": [
+    "select",
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "on_search"
+  },
+  {
+   "id": "IT2",
+   "group": "Items",
+   "check": "items[].parent_item_id (when sent) exists in the on_search catalog",
+   "apis": [
+    "select",
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "on_search"
+  },
+  {
+   "id": "IT3",
+   "group": "Items",
+   "check": "Requested item ids exist in the previous response",
+   "apis": [
+    "init",
+    "confirm"
+   ],
+   "against": "on_select / on_init"
+  },
+  {
+   "id": "IT4",
+   "group": "Items",
+   "check": "Response returns every item id that was requested",
+   "apis": [
+    "on_select",
+    "on_init",
+    "on_confirm"
+   ],
+   "against": "matching request"
+  },
+  {
+   "id": "IT5",
+   "group": "Items",
+   "check": "items[].fulfillment_ids all exist in order.fulfillments[].id",
+   "apis": [
+    "select",
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "IT6",
+   "group": "Items",
+   "check": "catalog items[].category_ids exist in provider.categories[].id",
+   "apis": [
+    "on_search"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "IT7",
+   "group": "Items",
+   "check": "catalog items[].fulfillment_ids exist in provider.fulfillments[].id",
+   "apis": [
+    "on_search"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "FL1",
+   "group": "Fulfillments",
+   "check": "Requested fulfillment ids exist in the previous response",
+   "apis": [
+    "init",
+    "confirm"
+   ],
+   "against": "on_select / on_init"
+  },
+  {
+   "id": "FL2",
+   "group": "Fulfillments",
+   "check": "Response returns every fulfillment id that was requested (BPP may add more)",
+   "apis": [
+    "on_select",
+    "on_init",
+    "on_confirm"
+   ],
+   "against": "matching request"
+  },
+  {
+   "id": "FL3",
+   "group": "Fulfillments",
+   "check": "fulfillments[].id exist in the on_search catalog (when the catalog lists fulfillments)",
+   "apis": [
+    "select",
+    "init",
+    "confirm"
+   ],
+   "against": "on_search"
+  },
+  {
+   "id": "FL4",
+   "group": "Fulfillments",
+   "check": "fulfillments[].type unchanged for the same fulfillment id",
+   "apis": [
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "previous call"
+  },
+  {
+   "id": "QT1",
+   "group": "Quote",
+   "check": "quote.id unchanged from the previous call that carried a quote",
+   "apis": [
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update"
+   ],
+   "against": "on_select / previous quote"
+  },
+  {
+   "id": "QT2",
+   "group": "Quote",
+   "check": "quote.price.value unchanged from on_init",
+   "apis": [
+    "confirm",
+    "on_confirm"
+   ],
+   "against": "on_init"
+  },
+  {
+   "id": "QT3",
+   "group": "Quote",
+   "check": "breakup[].price.currency equals quote.price.currency",
+   "apis": [
+    "on_select",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "QT4",
+   "group": "Quote",
+   "check": "breakup[].item.id refers to an order item, add-on or offer",
+   "apis": [
+    "on_select",
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update"
+   ],
+   "against": "same payload / on_search"
+  },
+  {
+   "id": "PM1",
+   "group": "Payments",
+   "check": "Requested payment ids exist in the previous response, and the response keeps them",
+   "apis": [
+    "confirm",
+    "on_confirm"
+   ],
+   "against": "on_init / confirm"
+  },
+  {
+   "id": "PM2",
+   "group": "Payments",
+   "check": "payments[].collected_by unchanged from the value agreed in search / earlier calls",
+   "apis": [
+    "on_select",
+    "init",
+    "on_init",
+    "confirm",
+    "on_confirm"
+   ],
+   "against": "search / previous call"
+  },
+  {
+   "id": "PM3",
+   "group": "Payments",
+   "check": "payments[].params.currency equals quote.price.currency",
+   "apis": [
+    "on_init",
+    "confirm",
+    "on_confirm",
+    "on_status",
+    "on_update"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "OR1",
+   "group": "Order",
+   "check": "Order id equals on_confirm order.id",
+   "apis": [
+    "status",
+    "on_status",
+    "update",
+    "on_update",
+    "cancel",
+    "on_cancel"
+   ],
+   "against": "on_confirm"
+  },
+  {
+   "id": "OR2",
+   "group": "Order",
+   "check": "order.created_at unchanged after on_confirm",
+   "apis": [
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "on_confirm"
+  },
+  {
+   "id": "OR3",
+   "group": "Order",
+   "check": "order.updated_at is not earlier than order.created_at",
+   "apis": [
+    "on_confirm",
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "same payload"
+  },
+  {
+   "id": "OR4",
+   "group": "Order",
+   "check": "order.updated_at is not earlier than in the previous order response",
+   "apis": [
+    "on_status",
+    "on_update",
+    "on_cancel"
+   ],
+   "against": "previous response"
+  },
+  {
+   "id": "OR5",
+   "group": "Order",
+   "check": "cancellation_terms unchanged from on_init",
+   "apis": [
+    "on_confirm"
+   ],
+   "against": "on_init"
+  },
+  {
+   "id": "OR6",
+   "group": "Order",
+   "check": "billing (when sent) unchanged from init",
+   "apis": [
+    "on_init",
+    "confirm",
+    "on_confirm"
+   ],
+   "against": "init"
+  },
+  {
+   "id": "FM1",
+   "group": "Forms (xinput)",
+   "check": "Request xinput.form.id equals the form id sent in the previous response",
+   "apis": [
+    "select",
+    "init",
+    "confirm"
+   ],
+   "against": "on_search / on_select / on_init"
+  },
+  {
+   "id": "FM2",
+   "group": "Forms (xinput)",
+   "check": "Request carries form_response.submission_id for the form sent in the previous response",
+   "apis": [
+    "select",
+    "init",
+    "confirm"
+   ],
+   "against": "on_search / on_select / on_init"
+  }
+ ]
+}

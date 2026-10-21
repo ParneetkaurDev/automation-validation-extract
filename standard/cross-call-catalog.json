@@ -1,0 +1,493 @@
+{
+ "version": "1.0",
+ "source": "claude/cross-call-checks-2026-10-14.md (tested on 2,330 FIS payloads)",
+ "note": "A check is covered in a branch when at least one extracted L2 row matches one of its matchers. Regexes run on the simple field names (indexes like [0] become []).",
+ "checks": [
+  {
+   "id": "CX1",
+   "group": "Request/response",
+   "desc": "Response transaction_id equals the request's",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "^context\\.transaction_id$"
+    }
+   ]
+  },
+  {
+   "id": "CX2",
+   "group": "Request/response",
+   "desc": "Response message_id equals the request's",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "^context\\.message_id$"
+    }
+   ]
+  },
+  {
+   "id": "CX3",
+   "group": "Request/response",
+   "desc": "Response timestamp is not earlier than the request's",
+   "match": [
+    {
+     "check": [
+      "Comparison",
+      "Custom logic"
+     ],
+     "cond": "timestamp"
+    }
+   ]
+  },
+  {
+   "id": "CX4",
+   "group": "Request/response",
+   "desc": "bpp_id/bpp_uri equal the BPP that sent on_search",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "^context\\.bpp_(id|uri)$"
+    }
+   ]
+  },
+  {
+   "id": "CX5",
+   "group": "Request/response",
+   "desc": "bap_id/bap_uri do not change during the transaction",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "^context\\.bap_(id|uri)$"
+    }
+   ]
+  },
+  {
+   "id": "PR1",
+   "group": "Provider",
+   "desc": "provider.id exists in the on_search catalog",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "provider(s\\[\\])?\\.id$|provider_?id",
+     "other": "catalog|providers\\[\\]\\.id"
+    }
+   ]
+  },
+  {
+   "id": "PR2",
+   "group": "Provider",
+   "desc": "provider.id does not change from the previous order call",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "provider\\.id$|provider_id",
+     "notOther": "catalog|user_inputs"
+    },
+    {
+     "check": [
+      "Matches"
+     ],
+     "other": "provider\\.id$|provider_id",
+     "field": "^session data:",
+     "notOther": "catalog"
+    }
+   ]
+  },
+  {
+   "id": "IT1",
+   "group": "Items",
+   "desc": "Each item id exists in the on_search catalog",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "items\\[\\]\\.id$|item_?id",
+     "other": "catalog|providers\\[\\]\\.items"
+    }
+   ]
+  },
+  {
+   "id": "IT2",
+   "group": "Items",
+   "desc": "parent_item_id exists in the catalog / previous call",
+   "match": [
+    {
+     "check": [
+      "Exists in",
+      "Matches"
+     ],
+     "field": "parent_item_id"
+    }
+   ]
+  },
+  {
+   "id": "IT3",
+   "group": "Items",
+   "desc": "Item ids in init/confirm exist in the previous response",
+   "match": [
+    {
+     "check": [
+      "Matches",
+      "Exists in"
+     ],
+     "field": "^(order|intent\\.provider)\\.items\\[\\]\\.id$",
+     "other": "^session data:",
+     "notOther": "catalog|user_inputs"
+    }
+   ]
+  },
+  {
+   "id": "IT4",
+   "group": "Items",
+   "desc": "The response returns every requested item",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "^session data:.*items.*id",
+     "other": "^order\\.items"
+    },
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "(?i)expected.*item",
+     "other": "(?i)item"
+    }
+   ]
+  },
+  {
+   "id": "IT5",
+   "group": "Items",
+   "desc": "items[].fulfillment_ids exist in order.fulfillments",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "fulfillment_ids",
+     "other": "fulfillments\\[\\]\\.id",
+     "notApi": "^on_search$"
+    },
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "fulfillments\\[\\]\\.id$",
+     "other": "items\\[\\]\\.fulfillment_ids",
+     "notApi": "^on_search$",
+     "notOther": "catalog"
+    }
+   ]
+  },
+  {
+   "id": "IT6",
+   "group": "Items",
+   "desc": "on_search: item category_ids exist in provider.categories",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "category_ids",
+     "other": "categories"
+    }
+   ]
+  },
+  {
+   "id": "IT7",
+   "group": "Items",
+   "desc": "on_search: item fulfillment_ids exist in provider.fulfillments",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "api": "^on_search$",
+     "field": "fulfillment",
+     "other": "fulfillment"
+    }
+   ]
+  },
+  {
+   "id": "FL1",
+   "group": "Fulfillments",
+   "desc": "Requested fulfillment ids exist in the previous response",
+   "match": [
+    {
+     "check": [
+      "Matches",
+      "Exists in"
+     ],
+     "field": "^order\\.fulfillments\\[\\]\\.id$",
+     "other": "^session data:",
+     "notOther": "catalog|user_inputs"
+    }
+   ]
+  },
+  {
+   "id": "FL2",
+   "group": "Fulfillments",
+   "desc": "The response returns every requested fulfillment id",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "^session data:.*fulfillment.*id",
+     "other": "^order\\.fulfillments"
+    }
+   ]
+  },
+  {
+   "id": "FL3",
+   "group": "Fulfillments",
+   "desc": "Fulfillment ids exist in on_search (when the catalog lists them)",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "fulfillment.*id",
+     "other": "catalog.*fulfillment"
+    }
+   ]
+  },
+  {
+   "id": "FL4",
+   "group": "Fulfillments",
+   "desc": "A fulfillment's type stays the same for the same id",
+   "match": [
+    {
+     "check": [
+      "Matches",
+      "Exists in"
+     ],
+     "field": "fulfillments\\[\\]\\.type$",
+     "other": "^session data:",
+     "notOther": "catalog"
+    }
+   ]
+  },
+  {
+   "id": "QT1",
+   "group": "Quote",
+   "desc": "quote.id does not change",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "quote\\.id$|quote_id"
+    }
+   ]
+  },
+  {
+   "id": "QT2",
+   "group": "Quote",
+   "desc": "quote.price.value in confirm/on_confirm equals on_init",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "quote\\.price\\.value$"
+    }
+   ]
+  },
+  {
+   "id": "QT3",
+   "group": "Quote",
+   "desc": "Breakup currency equals the quote currency",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "breakup.*currency"
+    }
+   ]
+  },
+  {
+   "id": "QT4",
+   "group": "Quote",
+   "desc": "Breakup item.id refers to an order item, add-on or offer",
+   "match": [
+    {
+     "check": [
+      "Exists in"
+     ],
+     "field": "breakup\\[\\]\\.item\\.id"
+    },
+    {
+     "check": [
+      "Exists in"
+     ],
+     "other": "breakup\\[\\]\\.item"
+    }
+   ]
+  },
+  {
+   "id": "PM1",
+   "group": "Payments",
+   "desc": "Payment ids carry over on_init \u2192 confirm \u2192 on_confirm",
+   "match": [
+    {
+     "check": [
+      "Matches",
+      "Exists in"
+     ],
+     "field": "payments\\[\\]\\.id$"
+    }
+   ]
+  },
+  {
+   "id": "PM2",
+   "group": "Payments",
+   "desc": "collected_by does not change",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "collected_by$"
+    }
+   ]
+  },
+  {
+   "id": "PM3",
+   "group": "Payments",
+   "desc": "Payment currency equals the quote currency",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "payments.*currency"
+    }
+   ]
+  },
+  {
+   "id": "OR1",
+   "group": "Order",
+   "desc": "order id in post-confirm calls equals on_confirm order.id",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "^(order\\.id|order_id|issue\\.refs\\[\\]\\.ref_id)$"
+    }
+   ]
+  },
+  {
+   "id": "OR2",
+   "group": "Order",
+   "desc": "created_at does not change after on_confirm",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "created_at$"
+    }
+   ]
+  },
+  {
+   "id": "OR3",
+   "group": "Order",
+   "desc": "updated_at is not earlier than created_at",
+   "match": [
+    {
+     "check": [
+      "Comparison",
+      "Custom logic"
+     ],
+     "cond": "updated_?at.*created_?at|created_?at.*updated_?at"
+    }
+   ]
+  },
+  {
+   "id": "OR4",
+   "group": "Order",
+   "desc": "updated_at does not go backwards between responses",
+   "match": [
+    {
+     "check": [
+      "Comparison",
+      "Matches"
+     ],
+     "field": "updated_at",
+     "notCond": "created_?at"
+    }
+   ]
+  },
+  {
+   "id": "OR5",
+   "group": "Order",
+   "desc": "cancellation_terms in on_confirm equal on_init",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "cancellation_terms"
+    }
+   ]
+  },
+  {
+   "id": "OR6",
+   "group": "Order",
+   "desc": "billing does not change from init onwards",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "billing"
+    }
+   ]
+  },
+  {
+   "id": "FM1",
+   "group": "Forms",
+   "desc": "Form id in the request equals the form id from the previous response",
+   "match": [
+    {
+     "check": [
+      "Matches"
+     ],
+     "field": "xinput\\.form\\.id$"
+    }
+   ]
+  },
+  {
+   "id": "FM2",
+   "group": "Forms",
+   "desc": "Request carries form_response.submission_id for that form",
+   "match": [
+    {
+     "check": [
+      "Matches",
+      "Required"
+     ],
+     "field": "form_response\\.submission_id$"
+    }
+   ]
+  }
+ ]
+}
