@@ -3,6 +3,7 @@
 | File | What it does |
 |---|---|
 | `crosscall.mjs` | Loads `standard/cross-call-catalog.json` and maps each extracted L2 check to a common cross-call ID (CX1…FM2) with fixed matching rules. Used by `simplify`, `compare` and `crosscall`. |
+| `xval-restructure.mjs` | Moves repeated x-validations (rule groups, rules, value lists) into a `_COMMON_` section of named anchors and reuses them with aliases; `verify()` proves the loaded `_TESTS_`/`_SESSION_DATA_` are unchanged. Used by `restructure-xval.mjs`. |
 | `messages.mjs` | Builds the developer messages when the gate fails: what is missing, where to add/fix it (file + line), a working example, how to waive. Also the GitHub `::error` annotations and the markdown fix list (`<branch>_fix-list.md`, run summary). |
 
 See them in action:

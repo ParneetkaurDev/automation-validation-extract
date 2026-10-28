@@ -2,7 +2,7 @@
 /**
  * run-branch.mjs — the three commands behind package.json, reading spec branches straight from GitHub.
  *
- *   npm run extract -- <branch> [<branch> ...] [--json-only] [--l1-only]
+ *   npm run extract -- <branch | GROUP> [<branch> ...] [--json-only] [--name combined-name] [--l1-only]
  *       L1 + L2 validations per branch                      → out/extract/<branch>/
  *
  *   npm run common  -- <GROUP> | <branch> <branch> [...] [--name <name>]
@@ -13,6 +13,9 @@
  *         <name>_summary   counts per use case
  *       every file as .json (sorted keys), .csv and .xlsx
  *       <GROUP> = a group from branch-groups.json (TRV, RET, FIS, ...) → name defaults to <GROUP>-common
+ *
+ *   npm run check-generators -- <branch | GROUP> [...] [--flow <text>]
+ *       mock generators: dynamic ids, meetsRequirements() coverage, code quality  → out/generators/<branch>/
  *
  *   npm run compare -- <branch> [<GROUP | common-name | path/to/common.json>]
  *       no common given → auto-picks the common report in out/common/ that fits the branch's domain
@@ -38,7 +41,7 @@ const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: here, stdio: '
 // ── args ──
 const [cmd, ...argv] = process.argv.slice(2);
 const pos = [], opt = {}, passthrough = [];
-const valueOpts = new Set(['--name', '--from', '--exclude']);
+const valueOpts = new Set(['--name', '--from', '--exclude', '--flow', '--runtime-keys']);
 for (let i = 0; i < argv.length; i++) {
   const k = argv[i];
   if (!k.startsWith('--')) pos.push(k);
@@ -47,13 +50,14 @@ for (let i = 0; i < argv.length; i++) {
   else passthrough.push(k); // --json-only, --l1-only, --include-requirements → extractor
 }
 const USAGE = `usage:
-  npm run extract -- <branch> [<branch> ...] [--json-only]
+  npm run extract -- <branch | GROUP> [<branch> ...] [--json-only] [--name combined-name]
   npm run common  -- <TRV|RET|FIS|...>                          (groups in branch-groups.json)
   npm run common  -- <branch> <branch> [...] [--name <name>]
-  npm run compare -- <branch> [<TRV|RET|FIS | common-name | common.json>]   (leave out to auto-pick)`;
+  npm run compare -- <branch> [<TRV|RET|FIS | common-name | common.json>]   (leave out to auto-pick)
+  npm run check-generators -- <branch | TRV|RET|FIS> [<branch> …] [--flow <text>] [--full]   (generator / requirements / duplicate checks, read-only)`;
 const GROUPS = (() => { try { return JSON.parse(fs.readFileSync(path.join(here, 'branch-groups.json'), 'utf8')); } catch { return {}; } })();
 const groupKey = (x) => Object.keys(GROUPS).find((k) => !k.startsWith('_') && k.toLowerCase() === String(x).toLowerCase());
-if (!['extract', 'common', 'compare'].includes(cmd) || !pos.length) die(USAGE);
+if (!['extract', 'common', 'compare', 'check-generators'].includes(cmd) || !pos.length) die(USAGE);
 
 // ── GitHub fetch into a bare cache repo ──
 let url = opt.from || process.env.SPEC_REPO_URL || 'https://github.com/ONDC-Official/automation-specifications.git';
@@ -101,12 +105,21 @@ function extract(branches, outDir, extra = []) {
 
 // ── commands ──
 if (cmd === 'extract') {
-  const branches = fetchBranches(pos);
+  // one workbook per branch: L1 · L2 per use case · L2 Common / Intersection / Specific between its use cases · Use cases · L2 vs L1
+  const expanded = [...new Set(pos.flatMap((p) => (groupKey(p) ? GROUPS[groupKey(p)] : [p])))];
+  const branches = fetchBranches(expanded);
   let failed = false;
   for (const b of branches) {
     const out = path.join('out', 'extract', safe(b));
     console.log(`── extract L1 + L2 → ${out}`);
     if (!extract([b], out).ok) failed = true;
+  }
+  // 2+ branches: one more workbook comparing every branch · use case with each other
+  if (branches.length > 1) {
+    const name = opt.name || (pos.length === 1 && groupKey(pos[0]) ? `${groupKey(pos[0])}-combined` : 'combined-' + branches.map((b) => b.replace(/^draft-/, '')).join('+'));
+    const out = path.join('out', 'extract', safe(name));
+    console.log(`── combined: ${branches.length} branches → ${out}`);
+    if (!extract(branches, out, ['--combined-only']).ok) failed = true;
   }
   process.exit(failed ? 1 : 0);
 }
@@ -128,6 +141,16 @@ if (cmd === 'common') {
   process.exit(st);
 }
 
+
+if (cmd === 'check-generators') {   // mock generate() / meetsRequirements() / saveData checks per flow step - read-only
+  const expanded = [...new Set(pos.flatMap((p) => (groupKey(p) ? GROUPS[groupKey(p)] : [p])))];
+  const branches = fetchBranches(expanded);
+  const args = ['check-generators.mjs', '--repo', CACHE, ...branches.flatMap((b) => ['--ref', b]), '--out', path.join('out', 'generators')];
+  if (opt.flow) args.push('--flow', opt.flow);
+  if (opt['runtime-keys']) args.push('--runtime-keys', opt['runtime-keys']);
+  if (passthrough.includes('--full')) args.push('--full');
+  process.exit(run(node, args));
+}
 // ── which common set to compare with ──
 const COMMON_DIR = path.join(here, 'out', 'common');
 const inCommon = (n) => path.join('out', 'common', safe(n), '1_common', `${safe(n)}_common.json`);

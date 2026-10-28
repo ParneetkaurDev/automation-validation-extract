@@ -14,7 +14,11 @@
     "common:trv": "node run-branch.mjs common TRV",
     "common:ret": "node run-branch.mjs common RET",
     "common:fis": "node run-branch.mjs common FIS",
-    "compare": "node run-branch.mjs compare"
+    "compare": "node run-branch.mjs compare",
+    "generators": "node run-branch.mjs check-generators",
+    "restructure-xval": "node restructure-xval.mjs",
+    "restructure-xval:current": "node restructure-xval.mjs --repo ../automation-specifications",
+    "restructure-xval:apply": "node restructure-xval.mjs --repo ../automation-specifications --apply"
   },
   "engines": {
     "node": ">=18"

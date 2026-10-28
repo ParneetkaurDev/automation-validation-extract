@@ -50,6 +50,7 @@ function parseArgs(argv) {
     else if (k === '--out') { a.out = v; i++; }
     else if (k === '--json-only') a.jsonOnly = true;
     else if (k === '--l1-only') a.l1Only = true;
+    else if (k === '--combined-only') a.combinedOnly = true;   // several branches: only the combined workbook (+ validations.json)
     else if (k === '--include-requirements') a.includeSession = true;
     else if (k === '-h' || k === '--help') { console.log(fs.readFileSync(new URL(import.meta.url)).toString().split('*/')[0]); process.exit(0); }
   }
@@ -412,6 +413,12 @@ function runsText(c) {
 function extractL2(src, babelParse) {
   const files = src.listFlows();
   const steps = []; const checks = []; const problems = [];
+  // flows/index.yaml: $ref → { id, usecase } (the flow id and use case shown in the workbench)
+  const idx = new Map();
+  try {
+    const ix = loadYaml(src.read('flows/index.yaml')).doc.toJS({ maxAliasCount: -1 });
+    for (const f of ix?.flows || []) { const ref = String(f?.config?.$ref || '').replace(/^\.\//, ''); if (ref) idx.set(ref, { id: f.id || '', usecase: f.usecase || '' }); }
+  } catch { /* no index - fall back to meta */ }
   // L2 coverage: counted once per distinct validate function (the same code is often copied into many steps)
   const cov = { fns: new Set(), passThrough: 0, withChecks: 0, unrecognised: [], sites: { return: 0, report: 0, throw: 0 } };
   for (const rel of files) {
@@ -419,7 +426,8 @@ function extractL2(src, babelParse) {
     let d;
     try { d = loadYaml(text).doc.toJS({ maxAliasCount: -1 }); } catch (e) { problems.push(`${rel}: ${e.message}`); continue; }
     if (!d || !Array.isArray(d.steps)) continue;
-    const flowId = d.meta?.flowId || rel;
+    const flowId = d.meta?.flowId || idx.get(rel)?.id || rel;
+    const useCaseId = d.meta?.use_case_id || idx.get(rel)?.usecase || '';
     const saved = new Map();
     d.steps.forEach((s, i) => {
       setSaved(new Map(saved));                                 // what earlier calls saved
@@ -451,7 +459,7 @@ function extractL2(src, babelParse) {
           const values = c.values ? c.values.map(String).join(', ') : '';
           const compared = showPath(c.other);
           checks.push({
-            api: step.api, flow: rel, flowId, step: i + 1, actionId: step.actionId, owner: step.owner,
+            api: step.api, flow: rel, flowId, useCaseId, step: i + 1, actionId: step.actionId, owner: step.owner,
             function: fnLabel, area: c.field?.root === 'session' ? 'Session data' : areaOf(c.field?.root === 'payload' ? '$.' + c.field.path : ''),
             field, fieldRoot: c.field?.root || '', checkType: c.type, validation: sentenceL2(c), comparedWith: compared, values,
             onlyWhen: runsText(c), condFields: (c.guardFields || []).join('; '), checkId: c.id || '', reads: c.reads || '',
@@ -520,8 +528,9 @@ function uniqueL2(checks) {
 const GOLD_COLS = ['Key', 'Layer', 'API', 'Field', 'Check', 'Values', 'Runs', 'Depends on', 'Validation', 'Source'];
 const RUN_RANK = { 'Always': 0, 'If present': 1, 'Conditional': 2 };
 const VALUE_LIST = /Allowed values|Expected value/;
+const byAction = (a, b) => a.localeCompare(b, undefined, { numeric: true });   // select_1, select_2, select_10
 function goldRows(res) {
-  const out = new Map();
+  const out = new Map(); const ids = new Map();   // key → { flows, useCases } (L2: every flow the validation is in)
   const normValues = (v, check) => {
     const s = String(v || '').trim(); if (!s) return '';
     return VALUE_LIST.test(check) ? s.split(',').map(x => x.trim()).filter(Boolean).sort().join(', ') : s.split('\n')[0].trim();
@@ -531,6 +540,11 @@ function goldRows(res) {
     const row = { Key: key, Layer: layer, API: r.api, Field: r.field, Check: check, Values: values,
       Runs: runs + (cond ? ` (${cond})` : ''), 'Depends on': runs === 'Conditional' ? (r.condFields || '') : '',
       Validation: r.validation, Source: source, _runs: runs, 'In L1?': r.inL1 || '', 'L1 remark': r.l1Remark || '' };
+    if (layer === 'L2') {
+      if (!ids.has(key)) ids.set(key, { flows: new Set(), useCases: new Set(), actions: new Set(), occ: [] });
+      const v = ids.get(key); if (r.flowId) v.flows.add(r.flowId); if (r.useCaseId) v.useCases.add(r.useCaseId); if (r.actionId) v.actions.add(r.actionId);
+      v.occ.push({ flow: r.flowId || '', uc: r.useCaseId || '', act: r.actionId || '' });   // where it is: use case → flow → step
+    }
     const prev = out.get(key);
     if (!prev || RUN_RANK[runs] < RUN_RANK[prev._runs]) out.set(key, row);
   };
@@ -544,6 +558,7 @@ function goldRows(res) {
     add('L2', r, r.checkType, normValues(r.values || r.comparedWith, r.checkType), r.onlyWhen ? 'Conditional' : 'Always', r.onlyWhen || '',
       `config/flows/${r.flow} step ${r.step} (${r.actionId}) mock.${fn}`);
   }
+  for (const [key, v] of ids) { const row = out.get(key); if (row) { row['Flow ID'] = [...v.flows].sort().join('\n'); row['Use case ID'] = [...v.useCases].sort().join('\n'); row['Action ID'] = [...v.actions].sort(byAction).join('\n'); Object.defineProperty(row, '_occ', { value: v.occ, enumerable: false }); } }
   return [...out.values()].sort((x, y) => x.Key.localeCompare(y.Key));
 }
 
@@ -556,6 +571,7 @@ function formatValidationSheet(ws) {
   const BANDS = ['FFFFFFFF', 'FFF3F6FA'];
   const RUN_COLOURS = { Always: 'FF1E6B34', 'If present': 'FF1F5FA8', Conditional: 'FFB54708' };
   const widths = ws.columns.map(c => c.width || 12);
+  const runsCol = ws.columns.findIndex(c => c.key === 'Runs') + 1;
   const head = ws.getRow(1);
   head.height = 34;
   head.eachCell(c => { c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; c.border = { top: GRID, bottom: GRID, left: GRID, right: GRID }; });
@@ -580,31 +596,148 @@ function formatValidationSheet(ws) {
       c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BANDS[band] } };
       c.border = { top: newGroup && i > 2 ? SEP : GRID, bottom: GRID, left: GRID, right: GRID };
     });
-    const runs = row.getCell(5); const kind = String(runs.value || '').split(' (')[0];
+    const runs = row.getCell(runsCol); const kind = String(runs.value || '').split(' (')[0];
     if (RUN_COLOURS[kind]) runs.font = { name: FONT, size: 10, color: { argb: RUN_COLOURS[kind] }, bold: kind !== 'Always' };
   });
   ws.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
 }
 
+// ── L2 by use case ──
+// A use case comes from the flow (meta.use_case_id, else the "usecase" in config/flows/index.yaml). Every L2 row carries
+// _occ: [{ flow, uc, act }] - where it runs. byUseCase() gives, per use case, every validation that runs there
+// (with the Action IDs / Flow IDs of that use case only).
+const UNKNOWN_UC = 'Use case not known';
+const ucsOf = (r) => [...new Set((r._occ || []).map(o => o.uc || UNKNOWN_UC))].sort((a, b) => a.localeCompare(b));
+function byUseCase(l2rows) {
+  const byUc = new Map();
+  for (const r of l2rows) {
+    const occ = r._occ || [];
+    for (const uc of ucsOf(r)) {
+      const mine = occ.filter(o => (o.uc || UNKNOWN_UC) === uc);
+      if (!byUc.has(uc)) byUc.set(uc, { uc, flows: new Set(), rows: [] });
+      const g = byUc.get(uc); mine.forEach(o => o.flow && g.flows.add(o.flow));
+      g.rows.push({ ...r, 'Action ID': [...new Set(mine.map(o => o.act).filter(Boolean))].sort(byAction).join('\n'),
+        'Flow ID': [...new Set(mine.map(o => o.flow).filter(Boolean))].sort().join('\n') });
+    }
+  }
+  return [...byUc.values()].sort((a, b) => (a.uc === UNKNOWN_UC) - (b.uc === UNKNOWN_UC) || a.uc.localeCompare(b.uc));
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+// One tab made of blocks: a shaded title row per block, then its rows (one colour band per API, Runs and In L1? coloured).
+function writeBlocks(wb, name, cols, blocks, emptyText) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
+  ws.columns = cols.map(([header, key, width]) => ({ header, key, width: width + 2 }));
+  const GRID = { style: 'thin', color: { argb: 'FFD9DEE5' } };
+  const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+  const RUN_COLOURS = { Always: 'FF1E6B34', 'If present': 'FF1F5FA8', Conditional: 'FFB54708' };
+  const head = ws.getRow(1); head.height = 34;
+  head.eachCell(c => { c.font = { name: FONT, bold: true, size: 11, color: { argb: 'FFFFFFFF' } }; c.fill = fill(NAVY); c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; });
+  const widths = cols.map(([, , w]) => w + 2);
+  const runsCol = cols.findIndex(([, k]) => k === 'Runs') + 1, inL1Col = cols.findIndex(([, k]) => k === 'In L1?') + 1;
+  const title = (text) => {
+    const t = ws.addRow([text]); ws.mergeCells(t.number, 1, t.number, cols.length);
+    t.getCell(1).font = { name: FONT, bold: true, size: 11, color: { argb: NAVY } }; t.getCell(1).fill = fill('FFDCE6F2');
+    t.getCell(1).alignment = { vertical: 'middle', indent: 1, wrapText: true };
+    t.height = Math.max(26, Math.ceil(text.length / (widths.reduce((x, y) => x + y, 0) * 1.1)) * 16 + 10);
+  };
+  if (!blocks.length) { title(emptyText || 'None'); return ws; }
+  let first = true;
+  for (const blk of blocks) {
+    if (!first) ws.addRow([]).height = 12; first = false;
+    title(blk.title);
+    let band = false, prevApi = null;
+    for (const r of [...blk.rows].sort((a, b) => apiRank(a.API) - apiRank(b.API) || a.API.localeCompare(b.API) || String(a['Action ID'] || '').localeCompare(String(b['Action ID'] || '')) || a.Field.localeCompare(b.Field) || a.Check.localeCompare(b.Check))) {
+      if (r.API !== prevApi) { band = !band; prevApi = r.API; }
+      const row = ws.addRow(Object.fromEntries(cols.map(([, k]) => [k, r[k] ?? ''])));
+      let lines = 1;
+      row.eachCell({ includeEmpty: true }, (c, col) => {
+        const per = Math.max(8, Math.floor((widths[col - 1] - 2) * 1.15));
+        lines = Math.max(lines, String(c.value ?? '').split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / per)), 0));
+        c.font = { name: FONT, size: 10, color: { argb: 'FF1F2933' } };
+        c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+        c.border = { bottom: GRID, left: GRID, right: GRID };
+        if (band) c.fill = fill('FFF3F6FA');
+      });
+      row.height = Math.max(24, lines * 14 + 10);
+      if (runsCol) { const kind = String(row.getCell(runsCol).value || '').split(' (')[0]; if (RUN_COLOURS[kind]) row.getCell(runsCol).font = { name: FONT, size: 10, color: { argb: RUN_COLOURS[kind] }, bold: kind !== 'Always' }; }
+      if (inL1Col && row.getCell(inL1Col).value === 'Duplicate') row.getCell(inL1Col).font = { name: FONT, size: 10, bold: true, color: { argb: 'FF1E6B34' } };
+    }
+  }
+  return ws;
+}
+
+// L2 Validations: one block per use case with every validation that runs there
+function writeL2Blocks(wb, l2rows, cols, name = 'L2 Validations') {
+  const groups = byUseCase(l2rows);
+  return writeBlocks(wb, name, cols, groups.map(g => ({ title: `Use case: ${g.uc}   ·   ${plural(g.rows.length, 'validation')}   ·   ${plural(g.flows.size, 'flow')}`, rows: g.rows })), 'No L2 validations');
+}
+
+// L2 Common / Intersection / Specific between the use cases, and a use-case summary
+function writeUseCaseTabs(wb, l2rows, base, unitWord = 'use case') {
+  const groups = byUseCase(l2rows); const all = groups.map(g => g.uc); const N = all.length;
+  const extra = [['In L1?', 'In L1?', 14]];
+  const flowsCount = (r) => { const n = new Set((r._occ || []).map(o => o.flow).filter(Boolean)).size; return plural(n, 'flow'); };
+  const common = l2rows.filter(r => ucsOf(r).length === N);
+  const inter = l2rows.filter(r => { const n = ucsOf(r).length; return n > 1 && n < N; });
+  const spec = l2rows.filter(r => ucsOf(r).length === 1 && N > 1);
+  // Common: one block
+  writeBlocks(wb, 'L2 Common', [...base, ...extra, ['Flows', 'Flows', 14]],
+    common.length ? [{ title: N > 1 ? `Common to all ${N} ${unitWord}s (${all.join(', ')})   ·   ${plural(common.length, 'validation')}` : `Only one ${unitWord} (${all[0] || '-'}) - all its ${plural(common.length, 'validation')}`,
+      rows: common.map(r => ({ ...r, Flows: flowsCount(r) })) }] : [], `No L2 validation is in all ${N} ${unitWord}s`);
+  // Intersection: one block per set of use cases
+  const sets = new Map();
+  for (const r of inter) { const k = ucsOf(r).join('|'); if (!sets.has(k)) sets.set(k, []); sets.get(k).push(r); }
+  const interBlocks = [...sets.entries()].sort((a, b) => b[0].split('|').length - a[0].split('|').length || a[0].localeCompare(b[0])).map(([k, rows]) => {
+    const has = k.split('|'); const missing = all.filter(u => !has.includes(u));
+    return { title: `In ${has.length} of ${N} ${unitWord}s: ${has.join(', ')}   ·   missing in: ${missing.join(', ')}   ·   ${plural(rows.length, 'validation')}`, rows: rows.map(r => ({ ...r, Flows: flowsCount(r) })) };
+  });
+  writeBlocks(wb, 'L2 Intersection', [...base, ...extra, ['Flows', 'Flows', 14]], interBlocks, N > 2 ? `No L2 validation is in more than one but not all ${unitWord}s` : `With ${N} ${unitWord}${N === 1 ? '' : 's'} there is no intersection (a validation is in all of them or in one)`);
+  // Specific: one block per use case
+  const specKeys = new Set(spec.map(r => r.Key));   // (rows in groups are copies without _occ - match on Key)
+  const specBlocks = groups.map(g => ({ g, rows: g.rows.filter(r => specKeys.has(r.Key)) })).filter(x => x.rows.length)
+    .map(({ g, rows }) => ({ title: `Only in ${unitWord}: ${g.uc}   ·   ${plural(rows.length, 'validation')}`, rows }));
+  writeBlocks(wb, 'L2 Specific', [...base, ...extra, ['Flow ID', 'Flow ID', 44]], specBlocks, N > 1 ? `No ${unitWord}-specific L2 validations` : `Only one ${unitWord} - see L2 Common`);
+  // Use cases: one row per use case
+  const rowsU = groups.map(g => {
+    const mine = new Set(g.rows.map(r => r.Key));
+    return { uc: g.uc, flows: g.flows.size, total: g.rows.length, common: common.filter(r => mine.has(r.Key)).length, inter: inter.filter(r => mine.has(r.Key)).length, spec: spec.filter(r => mine.has(r.Key)).length };
+  });
+  rowsU.push({ uc: `Total (unique validations)`, flows: groups.reduce((n, g) => n + g.flows.size, 0), total: l2rows.length, common: common.length, inter: inter.length, spec: spec.length });
+  const us = sheet(wb, `${unitWord[0].toUpperCase()}${unitWord.slice(1)}s`, [[`${unitWord[0].toUpperCase()}${unitWord.slice(1)}`, 'uc', 34], ['Flows', 'flows', 10], ['L2 validations', 'total', 14], ['Common (in all)', 'common', 14], ['Intersection (in some)', 'inter', 16], ['Specific (only here)', 'spec', 16]], rowsU, []);
+  us.getRow(1).height = 32; us.getRow(1).eachCell(c => { c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; });
+  us.eachRow((row, i) => { if (i > 1) for (let k = 2; k <= 6; k++) row.getCell(k).alignment = { horizontal: 'center', vertical: 'middle' }; });
+  const t = us.getRow(rowsU.length + 1); t.font = { name: FONT, size: 11, bold: true }; t.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F2' } }; });
+  us.addRow([]);
+  for (const [k, v] of [['Common', `in every ${unitWord} - "L2 Common" tab`], ['Intersection', `in more than one but not all ${unitWord}s - "L2 Intersection" tab`], ['Specific', `only in one ${unitWord} - "L2 Specific" tab`], ['L1', `L1 rules belong to a call, not a flow: they apply to every ${unitWord} and are only in the "L1 Validations" tab`]]) us.addRow([k, v]);
+  return { common, inter, spec };
+}
+
 async function writeDomainWorkbook(file, src, res) {
   const wb = new ExcelJS.Workbook(); wb.creator = 'extract-validations.mjs'; wb.created = new Date(0);
   // Clean business view: only what is needed to read and compare a validation (Layer = the tab, Key = API | Field | Check).
-  const cols = [['API', 'API', 16], ['Field', 'Field', 44], ['Check', 'Check', 16], ['Values', 'Values', 38], ['Runs', 'Runs', 36], ['Validation', 'Validation', 62]];
+  const cols = [['API', 'API', 16], ['Action ID', 'Action ID', 22], ['Field', 'Field', 44], ['Check', 'Check', 16], ['Values', 'Values', 38], ['Runs', 'Runs', 36], ['Validation', 'Validation', 62]];
   const rows = goldRows(res).sort((a, b) => apiRank(a.API) - apiRank(b.API) || a.API.localeCompare(b.API) || a.Field.localeCompare(b.Field) || a.Check.localeCompare(b.Check));
   const LCOL = { Duplicate: 'FF1E6B34' };
-  for (const layer of ['L1', 'L2']) {
-    const c = layer === 'L2' ? [...cols, ['In L1?', 'In L1?', 22], ['L1 remark', 'L1 remark', 80]] : cols;
-    const ws = sheet(wb, `${layer} Validations`, c, rows.filter(r => r.Layer === layer), []);
+  { // L1: one block per API, as before
+    const ws = sheet(wb, 'L1 Validations', cols.filter(([, k]) => k !== 'Action ID'), rows.filter(r => r.Layer === 'L1'), []);
     formatValidationSheet(ws);
-    if (layer === 'L2') ws.eachRow((row, i) => { if (i > 1) { const cell = row.getCell(7); const col = LCOL[cell.value]; if (col) cell.font = { name: FONT, size: 10, bold: true, color: { argb: col } }; } });
   }
-  // L2 vs L1 summary: one row per API, one column per result
-  const l2 = rows.filter(r => r.Layer === 'L2');
-  const apis = [...new Set(l2.map(r => r.API))];
-  const sumRows = [...apis.map(a => ({ API: a, ...Object.fromEntries(IN_L1_VALUES.map(l => [l, l2.filter(r => r.API === a && r['In L1?'] === l).length])), Total: l2.filter(r => r.API === a).length })),
-    { API: 'Total', ...Object.fromEntries(IN_L1_VALUES.map(l => [l, l2.filter(r => r['In L1?'] === l).length])), Total: l2.length }];
-  const ss = sheet(wb, 'L2 vs L1', [['API', 'API', 18], ['Duplicate', 'Duplicate', 14], ['Not in L1 (-)', '-', 14], ['Total', 'Total', 10]], sumRows, []);
-  ss.getRow(sumRows.length + 1).font = { name: FONT, size: 10, bold: true };
+  // L2: like the generator report - checks that are in the same set of flows form one block
+  // (the block title names the flows; a check in every flow goes to "Common to all flows"), Action ID per row
+  writeL2Blocks(wb, rows.filter(r => r.Layer === 'L2'), [...cols, ['In L1?', 'In L1?', 14], ['L1 remark', 'L1 remark', 80], ['Flow ID', 'Flow ID', 44]]);
+  // L2 between the use cases of this branch: Common / Intersection / Specific + a use-case summary
+  writeUseCaseTabs(wb, rows.filter(r => r.Layer === 'L2'), cols);
+  // Summary: one row per API (call) - L1 total, L2 total, and how many L2 checks are already in L1
+  const l1 = rows.filter(r => r.Layer === 'L1'), l2 = rows.filter(r => r.Layer === 'L2');
+  const apis = [...new Set([...l1, ...l2].map(r => r.API))].sort((a, b) => apiRank(a) - apiRank(b) || a.localeCompare(b));
+  const line = (api, a1, a2) => ({ API: api, L1: a1.length, L2: a2.length, ...Object.fromEntries(IN_L1_VALUES.map(l => [l, a2.filter(r => r['In L1?'] === l).length])) });
+  const sumRows = [...apis.map(a => line(a, l1.filter(r => r.API === a), l2.filter(r => r.API === a))), line('Total', l1, l2)];
+  const ss = sheet(wb, 'L2 vs L1', [['API (call)', 'API', 20], ['L1 total', 'L1', 12], ['L2 total', 'L2', 12], ['L2 already in L1 (Duplicate)', 'Duplicate', 18], ['L2 not exactly in L1 (-)', '-', 18]], sumRows, []);
+  ss.getRow(1).height = 32; ss.getRow(1).eachCell(c => { c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; });
+  ss.eachRow((row, i) => { if (i > 1) for (let k = 2; k <= 5; k++) row.getCell(k).alignment = { horizontal: 'center', vertical: 'middle' }; });
+  const tot = ss.getRow(sumRows.length + 1); tot.font = { name: FONT, size: 11, bold: true };
+  tot.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F2' } }; });
   ss.addRow([]);
   for (const l of IN_L1_VALUES) ss.addRow([l, IN_L1_HELP[l]]);
   const probs = [...res.l1.problems.map(p => ({ layer: 'L1', p })), ...(res.l2?.problems || []).map(p => ({ layer: 'L2', p }))];
@@ -623,7 +756,7 @@ if (!args.l1Only) {
   catch { console.error('L2 needs @babel/parser (npm install). Use --l1-only to skip L2.'); process.exit(2); }
 }
 fs.mkdirSync(args.out, { recursive: true });
-const results = []; const allL1 = []; const allL2 = [];
+const results = []; const allL1 = []; const allL2 = []; const combined = new Map();
 for (const src of sources) {
   const res = {};
   try { res.l1 = extractBranch(src); if (res.l1.error) res.error = res.l1.error; } catch (e) { res.error = e.message; res.l1 = { rows: [], problems: [], meta: {} }; }
@@ -632,8 +765,16 @@ for (const src of sources) {
   const safe = (x) => String(x || '').replace(/[^\w.-]+/g, '_');
   const meta = res.l1?.meta || {};
   const file = path.join(args.out, `${safe(meta.domain || 'UNKNOWN')}_${safe(meta.version)}_${safe(src.label)}_validations.xlsx`);
-  if (!args.jsonOnly && !res.error) await writeDomainWorkbook(file, src, res);
+  if (!args.jsonOnly && !args.combinedOnly && !res.error) await writeDomainWorkbook(file, src, res);
   results.push({ src, res, file });
+  if (!res.error && res.l2) {   // for the combined workbook: L2 rows with their use cases named "<branch> · <use case>"
+    const short = src.label.replace(/^draft-/, '');
+    for (const r of goldRows(res).filter(x => x.Layer === 'L2')) {
+      const occ = (r._occ || []).map(o => ({ ...o, uc: `${short} · ${o.uc || UNKNOWN_UC}` }));
+      if (!combined.has(r.Key)) { const c = { ...r }; Object.defineProperty(c, '_occ', { value: [], enumerable: false, writable: true }); combined.set(r.Key, c); }
+      combined.get(r.Key)._occ.push(...occ);
+    }
+  }
   const base = { domain: meta.domain, version: meta.version, branch: meta.branch || src.label, commit: src.commit };
   for (const r of res.l1?.rows || []) allL1.push({ ...base, ...r });
   for (const r of res.l2?.checks || []) allL2.push({ ...base, ...r });
@@ -650,6 +791,17 @@ const sortRows = (layer, rows) => rows
   .sort((a, b) => cmp(a.branch, b.branch) || apiRank(a.api) - apiRank(b.api) || cmp(a.api, b.api) || cmp(a.key, b.key)
     || cmp(String(a.values ?? ''), String(b.values ?? '')) || cmp(String(a.comparedWith ?? ''), String(b.comparedWith ?? ''))
     || cmp(a.flow ?? '', b.flow ?? '') || (a.step ?? 0) - (b.step ?? 0) || (a.line ?? 0) - (b.line ?? 0) || cmp(a.ruleName ?? a.condition ?? '', b.ruleName ?? b.condition ?? ''));
+// several branches: one more workbook comparing the L2 validations of every branch · use case with each other
+if (results.length > 1 && !args.jsonOnly && combined.size) {
+  const wb = new ExcelJS.Workbook(); wb.creator = 'extract-validations.mjs'; wb.created = new Date(0);
+  const cols = [['API', 'API', 16], ['Action ID', 'Action ID', 22], ['Field', 'Field', 44], ['Check', 'Check', 16], ['Values', 'Values', 38], ['Runs', 'Runs', 36], ['Validation', 'Validation', 62]];
+  const l2 = [...combined.values()];
+  writeL2Blocks(wb, l2, [...cols, ['Flow ID', 'Flow ID', 44]]);
+  writeUseCaseTabs(wb, l2, cols);
+  const cf = path.join(args.out, `combined_${results.length}-branches_validations.xlsx`);
+  await wb.xlsx.writeFile(cf);
+  console.log(`combined: ${results.length} branches, ${l2.length} unique L2 validations → ${cf}`);
+}
 fs.writeFileSync(path.join(args.out, 'validations.json'), JSON.stringify({ l1: sortRows('L1', allL1), l2: sortRows('L2', allL2) }, null, 1));
 console.log(`\nL1 ${allL1.length} rules, L2 ${allL2.length} check occurrences from ${results.length} branch(es) → ${path.resolve(args.out)}`);
 process.exit(results.some(r => r.res.error) ? 1 : 0);

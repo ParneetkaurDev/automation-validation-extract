@@ -84,20 +84,44 @@ Output in `out/extract/<branch>/`:
 
 Columns: API, Field, Check, Values, Runs, Validation. The **L2 Validations** tab also has:
 
-- **In L1?** — **Duplicate** when L1 already has this check, **-** when it doesn't
+- **In L1?** — **Duplicate** when L1 has the same validation (same field, check and values, and the L1 rule checks nothing more) - also when L1 runs it only conditionally (or only when the field is sent) or L2 runs it conditionally; the remark then names the condition difference. **-** when L1 does not have it or the check itself differs (other values, L1 rule checks more, covered by another field)
 - **L1 remark** — a plain sentence saying why, ending with the matching L1 rule and its line in `index.yaml`,
   e.g. `[L1: REQUIRED_ITEM_ID, line 1541]`. For a Duplicate it also says if anything differs (L1 allows more values,
   treats the field as optional, checks it only in some cases, or rejects a value L2 accepts).
+- **L2 layout** — one tab, one block per **use case** ("Use case: X · N validations · M flows"). Each block lists **every** L2 validation that runs in that use case (a check used in several use cases appears in each of their blocks), with the **Action ID**s and **Flow ID**s of that use case only. The L2 vs L1 totals count each validation once.
+- **Flow ID** / **Use case ID** — every flow the L2 validation appears in (one per line) and its use case (from the flow's `meta`, else `config/flows/index.yaml`). L2 sheet only.
 
 `validations.json` keeps the detailed result in `l1Detail` (Already in L1 · Covered by L1 · L2 is stricter ·
 Conflicts with L1 → *Duplicate*; Only in L2 · L2 adds a check · Check manually → *-*).
 
-The **L2 vs L1** tab counts these results per API, with the same explanations under the table.
+The **L2 vs L1** tab has one row per API (call): **L1 total**, **L2 total**, how many L2 checks are already in L1 (Duplicate) and how many are not (-), with a Total row and the same explanations under the table.
 
 Every validation has a **Key** = `Layer | API | Field | Check` (e.g. `L1 | search | context.bap_id | Required`); this
 is what `common` and `compare` match on.
 
 ---
+
+
+### Workbook tabs (one per branch: `out/extract/<branch>/…_validations.xlsx`)
+
+| Tab | What it shows |
+|---|---|
+| **L1 Validations** | every L1 rule, one colour band per API |
+| **L2 Validations** | one block per **use case** with every L2 validation that runs there (Action ID, In L1?, L1 remark, Flow ID) |
+| **L2 Common** | L2 validations in **every** use case of the branch |
+| **L2 Intersection** | in more than one but not all use cases - one block per set of use cases ("In 4 of 5 use cases … missing in …") |
+| **L2 Specific** | only in one use case - one block per use case |
+| **Use cases** | per use case: flows, L2 validations, common / intersection / specific, with a Total row |
+| **L2 vs L1** | per API: L1 total, L2 total, L2 already in L1 (Duplicate) / not exactly (-) |
+
+A use case comes from the flow (`meta.use_case_id`, else `usecase` in `config/flows/index.yaml`). L1 rules belong to a call,
+not a flow, so they apply to every use case and are only in the L1 tab.
+
+**Several branches** (`npm run extract -- <branch> <branch> …` or a group such as `FIS`): besides one workbook per branch you also get
+`out/extract/combined-<branches>/combined_<n>-branches_validations.xlsx` (name it with `--name`), with the same L2 tabs where every
+**branch · use case** is one use case - so you can see the L2 validations common to, shared by, or specific to each branch's use cases.
+
+The workflow is two phases: **1. `npm run extract`** (this workbook) → **2. `npm run compare`** (a branch against a common set built with `npm run common`).
 
 ## 5. Common — validations shared across use cases
 
@@ -130,6 +154,12 @@ Output in `out/common/<name>/`:
 Every report comes as **.xlsx** (separate `L1` / `L2` tabs), **.csv** (`_L1.csv` / `_L2.csv`) and **.json**
 (`{ "L1": [...], "L2": [...] }`, keys sorted, rows in a fixed order for clean diffs).
 
+The **.xlsx** files use the same format as the L1 / L2 extraction workbook, so they can be read side by side:
+columns **API · Field · Check · Values · Runs · Validation** first (same order, same colour band per API, Runs coloured),
+then the report's own columns (*Cross-call check* on L2 only, *In branches*, *Present in*, *Missing in*, one column per use case,
+*Remarks*). *Key*, *Layer*, *Depends on* and *Use case* are kept in the .csv / .json (in the workbook the layer and use case are the tab name).
+Each common / intersection workbook also has a **Total** tab (L1 total, L2 total and Total per API, with a Total row); the specific workbook's Total tab has one row per use case. The summary workbook shows **L1 total** and **L2 total** per use case and how many are common / in the intersection / specific per layer.
+
 Good to know:
 - With **2 branches** the intersection is always empty (a validation is either in both or in one).
 - L2 code is written per service, so across a whole domain few or no L2 checks are common (TRV: 98 L1, 0 L2).
@@ -158,7 +188,7 @@ Output in `out/compare/<branch>_vs_<common>/`:
 
 | File | Contents |
 |---|---|
-| `<branch>_vs_<common>.xlsx` | business view — tabs **Summary, Matching, Missing, Needs review, Extra** |
+| `<branch>_vs_<common>.xlsx` | business view in the same format as the extraction workbook — tabs **Summary** (result PASS / WARN / FAIL, L1 / L2 / Total per result, the kinds of review, key findings), **Per API** (one row per call: in common set, matching, needs review, blockers, missing, extra, Total row), **Needs review** (blockers first, with *What's different* and *What to do*), **Missing**, **Matching**, **Extra**, **Common set**. Every detail tab starts with API · Layer · Field · Check · Values · Runs · Validation |
 | `compare/<branch>_fix-list.md` | developer view — what to add or fix and where |
 | `compare/<branch>_vs_<common>.xlsx` | row-by-row comparison with a status per validation |
 | `report/` | the extraction of the branch |
@@ -174,6 +204,79 @@ Result (last line in the terminal, also the exit code):
 | OK / EXTRA | matches / only in this branch | pass |
 
 ---
+
+## 6b. Fix - remove L2 checks that repeat L1
+
+```bash
+npm run extract -- <branch> --from ParneetkaurDev/automation-specifications      # or extract from your local clone
+npm run fix-duplicates -- <branch> --repo ../automation-specifications           # dry run: report only
+npm run fix-duplicates -- <branch> --repo ../automation-specifications --include-covered --apply --git-branch fix/<name>
+```
+
+Reads `out/extract/<branch>/validations.json` (must be the same commit as the repo) and removes, from the flow-step
+`validate` code, the `if (…) return { valid: false }` blocks whose checks L1 already does ("Already in L1"; with
+`--include-covered` also "Covered by L1"). It keeps: guards that later code reads through (removing them would crash the
+validator), `if`s that also check something L1 doesn't, and checks where both layers are conditional. Every edit must
+still parse and leave all other checks unchanged. Report: `out/fix/<branch>/fix-report.md` + `.csv`. With
+`--git-branch` the change is committed on a new local branch; nothing is pushed. L1 is never touched.
+
+## 6d. Check generators - requirements, generator validations, static vs dynamic (analysis only)
+
+```bash
+npm run check-generators -- draft-FIS12SL-2.3.0                  # one branch
+npm run check-generators -- draft-FIS12SL-2.3.0 --flow drawdown  # only flows whose path contains "drawdown"
+npm run check-generators -- draft-FIS12SL-2.3.0 --full           # also the full report (requirement gaps, code quality …)
+```
+
+Reads every flow in `config/flows/**` (IGM steps - issue, on_issue, issue_status, on_issue_status - are left out; they get their own report later). Per step it decodes `mock.requirements`, `mock.generate` (+ helperLib), `mock.validate`
+and `saveData`, and reads the validations with the **same L2 extractor** (`lib/l2-analyse.mjs`) used for `validate()`.
+The code is parsed, never executed, and nothing in the spec repo is changed.
+Output: `out/generators/<branch>/generator-checks.xlsx` + `.json`
+
+| Tab | What it lists |
+|---|---|
+| Requirements validations | every validation in `requirements.js` (`meetsRequirements`): field, check type, validation, error message |
+| Generator validations | every validation in `generate()` and the functions it calls: `if (…) throw new Error(…)` and `if (…) return defaultPayload`. **Duplicate** when `requirements.js` or `validate()` already has the same check (`Duplicate (covered)` = requirements checks a deeper field), with the source and the matching check |
+| Could be dynamic | only the static values that could come from an earlier call: flow, Action ID, field, today's value and the `sessionData` value to use instead |
+| Static vs Dynamic | one row per field with all APIs and flows combined: **Dynamic** (from sessionData / user input / generated in every API), **Static** (hardcoded / defaultPayload in every API) or **Mixed** (dynamic in some APIs, static in others), with the Action IDs where it is static and where it is dynamic, and the flow names. Static values of the first search / on_search of each flow are left out (always static). The ones that could be dynamic are in the "Could be dynamic" tab; per-step detail is in `--full` |
+| Summary (last tab) | total requirements validations, total generator validations, duplicates (requirements.js / Validator), static vs dynamic counts and %, static values that could be dynamic, and the same per flow |
+
+The L2 extractor got an opt-in generator mode (`analyseFunction(code, parse, { mode: 'generator', fnName, paramRoots })`);
+without these options it behaves exactly as before. Keys the runtime adds itself (transactionId, mockBaseUrl, sessionId,
+user_inputs, …) are not expected in saveData; add more with `--runtime-keys a,b`. Tests: `node test/generator-checks.test.mjs`.
+
+## 6e. Restructure x-validations - common blocks defined once at the top (any domain)
+
+```bash
+npm run restructure-xval:current                                                           # checked-out branch of ../automation-specifications (dry run)
+npm run restructure-xval:apply                                                             # same, and write it back (not committed)
+npm run restructure-xval -- --repo "../automation-specifications"                          # the checked-out branch (dry run)
+npm run restructure-xval -- --repo "../automation-specifications" --apply                  # write it back (not committed)
+npm run restructure-xval -- --repo "../automation-specifications" --branch draft-TRV11-2.1.0,draft-RET11-1.2.5   # other domains, read with git show
+npm run restructure-xval -- --repo "../automation-specifications" --branch FIS             # a group from branch-groups.json
+```
+
+Rewrites `config/validations/index.yaml` so that every validation used in more than one place is defined **once** in a
+`_COMMON_` section at the top (named YAML anchors) and reused below with `*NAME`:
+
+| Block | What it is | Name |
+|---|---|---|
+| Rule group | a whole `_RETURN_` list shared by several APIs (e.g. the context checks) | `<shared part of the parent names>_CHECKS`, e.g. `CONTEXT_CHECKS` |
+| Rule | one rule (`_NAME_` + variables + `_CONTINUE_` + `_RETURN_`) | its `_NAME_` (+ `_<API>` when two different rules share a name) |
+| Value list | an enum / regex / tag list used as a variable | `ENUM_` / `REGEX_` / `TAGS_` / `LIST_` + the field it checks, e.g. `ENUM_ORDER_FULFILLMENTS_TYPE` |
+
+Biggest blocks first, so a rule that only repeats inside a repeated group is not split out again. Existing anchors
+(`&a1` …) are expanded and rebuilt under readable names. Nothing about a domain is hard-coded.
+**Check:** before and after are loaded with `yaml` and `js-yaml` and `_TESTS_` / `_SESSION_DATA_` must be identical value by
+value; `--apply` only writes when that holds. The code generator reads only `_TESTS_` and `_SESSION_DATA_` (and deep-copies
+the config first), so the generated validators do not change.
+Output: `out/restructure-xval/<branch>/`:
+- `index.yaml` (restructured) and `original.yaml` (the input, for comparing)
+- `changes.xlsx` - **what changed in the current x-validations**: tabs *Changes* (one row per place: API, rule path, old text,
+  change, `*NAME` that replaced it, common block, note), *Common blocks* (each `_COMMON_` entry with its YAML), *Per API*,
+  *Old anchors* (`&a1` → new name, times used)
+- `changes.diff` (line diff original → new), `report.md` (per API / per change as markdown, plus the summary and the comments that were only in a duplicate copy), `report.json`. Options: `--min-uses 2`, `--kinds RULES,RULE,LIST`, `--out`.
+Tests: `node test/xval-restructure.test.mjs`.
 
 ## 7. Typical workflows
 
@@ -258,6 +361,7 @@ node test/run-tests.mjs          # runner, lint, extractor, compare
 node test/l2-analyse.test.mjs    # L2 patterns
 node test/l1-vs-l2.test.mjs      # L2 vs L1 comparison
 node test/l2-patterns.test.mjs   # every pattern in the registry
+node test/generator-checks.test.mjs   # generator / requirements checks
 ```
 
 The before/after check of the L2 analyser on all 42 branches is in `out/baseline/BEFORE_AFTER.md`.

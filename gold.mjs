@@ -21,10 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ExcelJS from 'exceljs';
 import YAML from 'yaml';
-import { loadCatalog, crossCallIds, coverage } from './lib/crosscall.mjs';
+import { loadCatalog, crossCallIds, crossCallText, crossCallCodesToText, coverage } from './lib/crosscall.mjs';
 import { developerMessages } from './lib/messages.mjs';
 
-const COLS = ['Key', 'Layer', 'API', 'Field', 'Check', 'Values', 'Runs', 'Depends on', 'Cross-call ID', 'Validation', 'Source', 'Code'];
+const COLS = ['Key', 'Layer', 'API', 'Field', 'Check', 'Values', 'Runs', 'Depends on', 'Cross-call check', 'Validation', 'Source', 'Code'];
 const RUN_RANK = { 'Always': 0, 'If present': 1, 'Conditional': 2 };
 const VALUE_LIST = /Allowed values|Expected value/;
 
@@ -76,7 +76,7 @@ function simplify(rows) {
       Key: key, Layer: layer, API: r.api, Field: r.field, Check: check, Values: values,
       Runs: runInfo.runs + (runInfo.cond ? ` (${runInfo.cond})` : ''), _runs: runInfo.runs,
       'Depends on': runInfo.runs === 'Conditional' ? (r.condFields || '') : '',
-      'Cross-call ID': layer === 'L2' ? crossCallIds({ ...r, layer }, catalog).join(', ') : '',
+      'Cross-call check': layer === 'L2' ? crossCallText({ ...r, layer }, catalog) : '',
       Validation: r.validation, Branch: r.branch, Domain: r.domain, Version: r.version,
       ...sourceOf(layer, r),
     };
@@ -154,7 +154,61 @@ async function writeXlsx(file, sheets) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   await wb.xlsx.writeFile(file);
 }
-const W = { 'Gold example': 60, 'Branch source': 45, 'Branch code': 60, Key: 45, Field: 40, Values: 30, Runs: 35, 'Depends on': 30, Validation: 60, Status: 18, 'What to do': 55,
+// ---------- extraction-style validation sheets (same look as the L1 / L2 extraction workbook) ----------
+// API · Field · Check · Values · Runs · Validation first, report-specific columns after; one colour band per API,
+// a thicker line where a new API starts, roomy rows, Runs coloured (Always green, If present blue, Conditional amber).
+const X = { NAVY: 'FF1F3A5F', FONT: 'Arial', GRID: { style: 'thin', color: { argb: 'FFD9DEE5' } }, SEP: { style: 'medium', color: { argb: 'FF8A97A8' } },
+  BANDS: ['FFFFFFFF', 'FFF3F6FA'], RUNS: { Always: 'FF1E6B34', 'If present': 'FF1F5FA8', Conditional: 'FFB54708' } };
+const XW = { API: 16, Field: 44, Check: 16, Values: 38, Runs: 36, Validation: 62, 'Cross-call check': 44, 'In branches': 12, 'Present in': 30, 'Missing in': 30, Remarks: 70 };
+const X_FIRST = ['API', 'Field', 'Check', 'Values', 'Runs', 'Validation'];
+function xSheet(wb, name, cols, rows) {
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
+  ws.columns = cols.map((c) => ({ header: c, key: c, width: XW[c] || 18 }));
+  rows.forEach((r) => ws.addRow(Object.fromEntries(cols.map((c) => [c, r[c] ?? '']))));
+  const head = ws.getRow(1); head.height = 34;
+  head.eachCell((c) => { c.font = { name: X.FONT, bold: true, size: 10, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: X.NAVY } };
+    c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true }; c.border = { top: X.GRID, bottom: X.GRID, left: X.GRID, right: X.GRID }; });
+  const widths = ws.columns.map((c) => c.width || 12); const runsCol = cols.indexOf('Runs') + 1;
+  let band = 0, prev = null;
+  ws.eachRow((row, i) => {
+    if (i === 1) return;
+    const api = row.getCell(1).value; const newGroup = api !== prev; if (newGroup && prev !== null) band = 1 - band; prev = api;
+    let lines = 1;
+    row.eachCell({ includeEmpty: true }, (c, col) => { const per = Math.max(8, Math.floor((widths[col - 1] - 2) * 1.15));
+      lines = Math.max(lines, String(c.value ?? '').split('\n').reduce((n, part) => n + Math.max(1, Math.ceil(part.length / per)), 0)); });
+    row.height = Math.max(24, lines * 14 + 10);
+    row.eachCell({ includeEmpty: true }, (c, col) => {
+      c.font = { name: X.FONT, size: 10, bold: col === 1 && newGroup, color: { argb: 'FF1F2933' } };
+      c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1, wrapText: true };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: X.BANDS[band] } };
+      c.border = { top: newGroup && i > 2 ? X.SEP : X.GRID, bottom: X.GRID, left: X.GRID, right: X.GRID };
+    });
+    if (runsCol) { const r = row.getCell(runsCol); const k = String(r.value || '').split(' (')[0]; if (X.RUNS[k]) r.font = { name: X.FONT, size: 10, color: { argb: X.RUNS[k] }, bold: k !== 'Always' }; }
+  });
+  if (rows.length) ws.autoFilter = { from: 'A1', to: { row: 1, column: cols.length } };
+  return ws;
+}
+function xSummary(wb, name, cols, rows, totalLast = false) {   // small count tables: navy header, numbers centred, Total row bold
+  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
+  ws.columns = cols.map((c, k) => ({ header: c, key: c, width: k === 0 ? 30 : Math.max(12, Math.min(40, c.length + 4)) }));
+  rows.forEach((r) => ws.addRow(r));
+  ws.eachRow((row, i) => {
+    row.height = i === 1 ? 34 : 24;
+    row.eachCell({ includeEmpty: true }, (c, col) => {
+      const num = typeof c.value === 'number';
+      c.font = { name: X.FONT, size: 10, bold: i === 1 || (totalLast && i === rows.length + 1), color: { argb: i === 1 ? 'FFFFFFFF' : 'FF1F2933' } };
+      c.alignment = { vertical: 'middle', horizontal: i === 1 ? 'center' : num ? 'center' : 'left', indent: num ? 0 : 1, wrapText: true };
+      c.border = { top: X.GRID, bottom: X.GRID, left: X.GRID, right: X.GRID };
+      if (i === 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: X.NAVY } };
+      else if (totalLast && i === rows.length + 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F2' } };
+      else if (i % 2) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: X.BANDS[1] } };
+    });
+  });
+  return ws;
+}
+async function saveWb(wb, file) { fs.mkdirSync(path.dirname(file), { recursive: true }); await wb.xlsx.writeFile(file); }
+
+const W = { 'Gold example': 60, 'Branch source': 45, 'Branch code': 60, Key: 45, Field: 40, Values: 30, Runs: 35, 'Depends on': 30, Validation: 60, 'Cross-call check': 50, Status: 18, 'What to do': 55,
   'Gold runs': 30, 'Branch runs': 30, 'Gold values': 25, 'Branch values': 25, Check: 22, Example: 60, 'Checked in APIs': 30 };
 const safe = (s) => String(s).replace(/[^A-Za-z0-9.@_-]+/g, '_');
 
@@ -380,8 +434,8 @@ else if (cmd === 'compare') {
       { name: 'Summary', cols: ['Status', 'Meaning', 'Result', 'Count'], rows: [...summary,
         { Status: 'Baseline', Meaning: goldName, Result: result, Count: gold.length },
         { Status: 'Cross-call', Meaning: 'Common cross-call checks implemented in L2 (see Cross-call tab)', Result: 'INFO', Count: `${cc.filter((c) => c.Covered === 'Yes').length}/${cc.length}` }], widths: { Meaning: 60 } },
-      { name: 'Comparison', cols: ['Status', 'Layer', 'API', 'Field', 'Check', 'Gold values', 'Branch values', 'Gold runs', 'Branch runs', 'What to do', 'Gold example', 'Branch source', 'Branch code', 'Key'], rows, widths: W },
-      { name: 'Cross-call', cols: ['ID', 'Group', 'Check', 'Covered', 'Checked in APIs', 'Occurrences', 'Example'], rows: cc, widths: W },
+      { name: 'Comparison', cols: ['Status', 'Layer', 'API', 'Field', 'Check', 'Gold values', 'Branch values', 'Gold runs', 'Branch runs', 'What to do'], rows, widths: W },
+      { name: 'Cross-call', cols: ['Group', 'Check', 'Covered', 'Checked in APIs', 'Occurrences', 'Example'], rows: cc, widths: W },
     ]);
     console.log(`${branch} vs ${goldName}: ${result}  ` + summary.map((s) => `${s.Status}=${s.Count}`).join('  ') + `  cross-call=${cc.filter((c) => c.Covered === 'Yes').length}/${cc.length}  -> ${file}`);
     const msgs = developerMessages(rows, { branch, goldName, result, summary, maxWarnings: Number(args['max-warnings'] ?? 20) });
@@ -433,7 +487,7 @@ else if (cmd === 'partition') {
     }
     if (votes.size > 1) remarks.push('Runs differ - ' + all.map(({ b, r }) => `${label(b)}: ${r.Runs}`).join('; '));
     const row = { Key: key, Layer: base.Layer, API: base.API, Field: base.Field, Check: base.Check, Values: values, Runs: runsRow.Runs,
-      'Depends on': runsRow['Depends on'], Validation: base.Validation, 'Cross-call ID': base['Cross-call ID'] || '',
+      'Depends on': runsRow['Depends on'], Validation: base.Validation, 'Cross-call check': base['Cross-call check'] || crossCallCodesToText(base['Cross-call ID'], catalog),
       'In branches': `${has.length}/${pick.length}`, Source: `${runsRow.Branch}: ${runsRow.Source}`, Code: runsRow.Code };
     if (has.length === pick.length) common.push({ ...row, Remarks: remarks.join(' | ') });
     else if (has.length > 1) {
@@ -443,13 +497,23 @@ else if (cmd === 'partition') {
         ...Object.fromEntries(pick.map((b) => [label(b), lists.get(b).has(key) ? (lists.get(b).get(key).Values || 'Yes') : '-'])) });
     } else specific.get(has[0]).push({ ...row, 'Use case': label(has[0]), Values: base.Values, Runs: base.Runs, 'Depends on': base['Depends on'], Source: base.Source, Code: base.Code });
   }
-  const BASE = ['Key', 'Layer', 'API', 'Field', 'Check', 'Values', 'Runs', 'Depends on', 'Validation', 'Cross-call ID'];
+  const BASE = ['Key', 'Layer', 'API', 'Field', 'Check', 'Values', 'Runs', 'Depends on', 'Validation', 'Cross-call check'];
   const COLS_COMMON = [...BASE, 'In branches', 'Remarks'];
   const COLS_INTER = [...BASE, 'In branches', 'Present in', 'Missing in', ...pick.map(label), 'Remarks'];
   const COLS_SPEC = ['Use case', ...BASE];
   const WW = { ...W, Remarks: 70, 'Present in': 30, 'Missing in': 30, Code: 60, Source: 45, ...Object.fromEntries(pick.map((b) => [label(b), 18])) };
   // Every file has the L1 and L2 validations apart: XLSX → one tab per layer, CSV → one file per layer, JSON → { L1: [...], L2: [...] }
   const LAYERS = ['L1', 'L2'];
+  // XLSX columns in the extraction order: API, Field, Check, Values, Runs, Validation, then the report's own columns.
+  // Key / Layer / Depends on / Use case stay in JSON and CSV (the layer and use case are the tab name); L1 has no cross-call checks.
+  // "Total" tab: L1 total and L2 total per API (call), like the extraction's summary, with a Total row
+  const apiTotals = (wb, by, name = 'Total') => {
+    const apis = [...new Set([...by.L1, ...by.L2].map((r) => r.API))].sort((a, b) => apiRank(a) - apiRank(b) || String(a).localeCompare(String(b)));
+    const rows = [...apis.map((a) => { const n1 = by.L1.filter((r) => r.API === a).length, n2 = by.L2.filter((r) => r.API === a).length; return { 'API (call)': a, 'L1 total': n1, 'L2 total': n2, Total: n1 + n2 }; }),
+      { 'API (call)': 'Total', 'L1 total': by.L1.length, 'L2 total': by.L2.length, Total: by.L1.length + by.L2.length }];
+    xSummary(wb, name, ['API (call)', 'L1 total', 'L2 total', 'Total'], rows, true);
+  };
+  const xCols = (cols, l) => [...X_FIRST, ...cols.filter((c) => !X_FIRST.includes(c) && !['Key', 'Layer', 'Depends on', 'Use case', 'Source', 'Code'].includes(c) && !(l === 'L1' && c === 'Cross-call check'))];
   const tabName = (t) => t.replace(/[\[\]:*?/\\]/g, '_').slice(0, 31);
   const pickCols = (cols, r) => Object.fromEntries(cols.map((c) => [c, r[c] ?? '']));
   const split = (rows) => Object.fromEntries(LAYERS.map((l) => [l, rows.filter((r) => r.Layer === l).sort(order)]));
@@ -458,7 +522,10 @@ else if (cmd === 'partition') {
     const by = split(rows);
     fs.writeFileSync(file + '.json', JSON.stringify(sortKeys(Object.fromEntries(LAYERS.map((l) => [l, by[l].map((r) => pickCols(cols, r))]))), null, 1) + '\n');
     for (const l of LAYERS) writeCsv(`${file}_${l}.csv`, cols, by[l]);
-    await writeXlsx(file + '.xlsx', LAYERS.map((l) => ({ name: tabName(`${title} ${l}`), cols, rows: by[l], widths: WW })));
+    const wb = new ExcelJS.Workbook();
+    for (const l of LAYERS) xSheet(wb, tabName(`${title} ${l}`), xCols(cols, l), by[l]);
+    apiTotals(wb, by);
+    await saveWb(wb, file + '.xlsx');
     return file;
   };
   const files = [];
@@ -471,7 +538,12 @@ else if (cmd === 'partition') {
     fs.writeFileSync(file + '.json', JSON.stringify(sortKeys(Object.fromEntries(per.map(({ uc, by }) => [uc, Object.fromEntries(LAYERS.map((l) => [l, by[l].map((r) => pickCols(COLS_SPEC, r))]))]))), null, 1) + '\n');
     for (const l of LAYERS) writeCsv(`${file}_${l}.csv`, COLS_SPEC, per.flatMap(({ by }) => by[l]));
     const used = new Set(); const uniq = (t) => { let n = tabName(t), i = 2; while (used.has(n)) n = tabName(`${t.slice(0, 27)} ${i++}`); used.add(n); return n; };
-    await writeXlsx(file + '.xlsx', per.flatMap(({ uc, by }) => LAYERS.map((l) => ({ name: uniq(`${uc} ${l}`), cols: COLS_SPEC, rows: by[l], widths: WW }))));
+    const wb = new ExcelJS.Workbook();
+    for (const { uc, by } of per) for (const l of LAYERS) xSheet(wb, uniq(`${uc} ${l}`), xCols(COLS_SPEC, l), by[l]);
+    // Total tab: per use case L1 / L2 totals
+    xSummary(wb, 'Total', ['Use case', 'L1 total', 'L2 total', 'Total'], [...per.map(({ uc, by }) => ({ 'Use case': uc, 'L1 total': by.L1.length, 'L2 total': by.L2.length, Total: by.L1.length + by.L2.length })),
+      { 'Use case': 'Total', 'L1 total': per.reduce((n, p) => n + p.by.L1.length, 0), 'L2 total': per.reduce((n, p) => n + p.by.L2.length, 0), Total: per.reduce((n, p) => n + p.by.L1.length + p.by.L2.length, 0) }], true);
+    await saveWb(wb, file + '.xlsx');
     files.push(file);
   }
   // summary
@@ -492,8 +564,20 @@ else if (cmd === 'partition') {
     { File: '3_specific', Contains: 'One file: a tab per use case and layer (e.g. "TRV11-2.1.0 L1") with the validations only that use case has' },
     { File: 'Layers', Contains: 'Every file keeps L1 and L2 apart: XLSX tabs "... L1" / "... L2", CSV files *_L1.csv / *_L2.csv, JSON { "L1": [...], "L2": [...] }' },
   ];
-  await writeXlsx(path.join(outDir, `${safe(name)}_summary.xlsx`), [{ name: 'Summary', cols: SCOLS, rows: summary, widths: { 'Use case': 28 } },
-    { name: 'Files', cols: ['File', 'Contains'], rows: legend, widths: { File: 18, Contains: 100 } }]);
+  {
+    // like the extraction summary: L1 total / L2 total per use case, then common / intersection / specific per layer
+    const wb = new ExcelJS.Workbook();
+    const tot = (k) => summary.reduce((n, r) => n + (Number(r[k]) || 0), 0);
+    const rowsS = summary.map((r) => ({ 'Use case': r['Use case'], 'L1 total': r['Total L1'], 'L2 total': r['Total L2'], 'Common L1': r['Common L1'], 'Common L2': r['Common L2'],
+      'In intersection L1': r['In intersection L1'], 'In intersection L2': r['In intersection L2'], 'Specific L1': r['Specific L1'], 'Specific L2': r['Specific L2'] }));
+    xSummary(wb, 'Summary', ['Use case', 'L1 total', 'L2 total', 'Common L1', 'Common L2', 'In intersection L1', 'In intersection L2', 'Specific L1', 'Specific L2'], rowsS);
+    const ws = wb.getWorksheet('Summary'); ws.addRow([]);
+    const meta2 = [['Domain / version', [...new Set(summary.map((r) => `${r.Domain} ${r.Version}`))].join(', ')], ['Common to all use cases', `L1 ${nL(common, 'L1')} · L2 ${nL(common, 'L2')}`], ['In more than one (intersection)', `L1 ${nL(inter, 'L1')} · L2 ${nL(inter, 'L2')}`]];
+    for (const [a, b] of meta2) { const r = ws.addRow([a, b]); r.height = 22; r.getCell(1).font = { name: X.FONT, size: 10, bold: true }; r.getCell(2).font = { name: X.FONT, size: 10 }; }
+    xSummary(wb, 'Files', ['File', 'Contains'], legend);
+    wb.getWorksheet('Files').getColumn(2).width = 110;
+    await saveWb(wb, path.join(outDir, `${safe(name)}_summary.xlsx`));
+  }
   console.log(`${name}: ${pick.length} use cases → common ${common.length} | intersection ${inter.length} | specific ` + pick.map((b) => `${label(b)} ${specific.get(b).length}`).join(', '));
   console.log(`  ${outDir}/${safe(name)}_summary.xlsx\n  ${outDir}/1_common/  ${outDir}/2_intersection/  ${outDir}/3_specific/   (.xlsx with L1/L2 tabs, .json, _L1.csv/_L2.csv)`);
 }
@@ -508,7 +592,7 @@ else if (cmd === 'crosscall') {
   }
   for (const m of matrix) m['Branches covering'] = pick.filter((b) => m[b] === 'Yes').length;
   const file = path.join(outDir, 'Cross-call_coverage.xlsx');
-  await writeXlsx(file, [{ name: 'Coverage', cols: ['ID', 'Group', 'Check', ...pick, 'Branches covering'], rows: matrix, color: pick, widths: { Check: 55 } }]);
+  await writeXlsx(file, [{ name: 'Coverage', cols: ['Group', 'Check', ...pick, 'Branches covering'], rows: matrix, color: pick, widths: { Check: 55 } }]);
   console.log(`cross-call coverage for ${pick.length} branches -> ${file}`);
   for (const b of pick) console.log(`  ${b.padEnd(28)} ${matrix.filter((m) => m[b] === 'Yes').length}/${matrix.length}`);
 }
